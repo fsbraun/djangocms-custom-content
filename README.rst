@@ -64,6 +64,11 @@ This package is intended to be extended in your project:
 
 The exact configuration depends on your project and the content types you build.
 
+To learn how to build your own model-based content types with this framework, see the
+documentation section "Creating custom models":
+
+https://not-yet-there.readthedocs.io/
+
 Contrib examples
 ================
 
@@ -73,17 +78,17 @@ enabled in a project as-is or copied and adapted.
 
 Available example modules:
 
-* ``djangocms_custom_content.contrib.people``  simple ``Person`` model + "Person" teaser plugin
-* ``djangocms_custom_content.contrib.services``  simple ``Service`` model + teaser + "featured services" plugin
-* ``djangocms_custom_content.contrib.categories``  simple taxonomy + category list plugin
-* ``djangocms_custom_content.contrib.blog``  simple blog posts with category relationship + teaser + latest posts plugin
+* ``djangocms_custom_content.contrib.people``: Simple ``Person`` model + "Person" teaser plugin
+* ``djangocms_custom_content.contrib.services``: Simple ``Service`` model + teaser + "featured services" plugin
+* ``djangocms_custom_content.contrib.categories``: Simple taxonomy + category list plugin
+* ``djangocms_custom_content.contrib.blog``: Simple blog posts with category relationship + teaser + latest posts plugin
 
 To enable one (or more) of them, add the module(s) to ``INSTALLED_APPS`` and run migrations::
 
     INSTALLED_APPS = [
         ...,
         'djangocms_custom_content',
-        'djangocms_custom_content.contrib.people',
+        'djangocms_custom_content.contrib.people',  # contrib are optional
         'djangocms_custom_content.contrib.services',
         'djangocms_custom_content.contrib.categories',
         'djangocms_custom_content.contrib.blog',
