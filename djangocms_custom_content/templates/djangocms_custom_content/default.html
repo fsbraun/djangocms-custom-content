@@ -1,0 +1,9 @@
+{% load cms_tags %}
+<div class="custom-content">
+    {% if instance.content %}
+        {{ instance.content|safe }}
+    {% endif %}
+    {% for plugin in instance.child_plugin_instances %}
+        {% render_plugin plugin %}
+    {% endfor %}
+</div>

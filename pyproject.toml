@@ -1,0 +1,180 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+
+requires = [ "setuptools", "setuptools-scm" ]
+
+[project]
+name = "djangocms-custom-content"
+description = "Custom content plugin for django CMS providing flexible template-based content blocks."
+readme = "README.rst"
+license = {text = "BSD-3-Clause"}
+authors = [
+  { name = "Fabian Braun", email = "fsbraun@gmx.de" },
+]
+requires-python = ">=3.10"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: Django",
+  "Framework :: Django :: 4.2",
+  "Framework :: Django :: 5.0",
+  "Framework :: Django :: 5.1",
+  "Framework :: Django :: 5.2",
+  "Framework :: Django CMS",
+  "Framework :: Django CMS :: 3.11",
+  "Framework :: Django CMS :: 4.1",
+  "Framework :: Django CMS :: 5.0",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dynamic = [ "version" ]
+dependencies = [
+  "django-cms>=3.11",
+]
+
+optional-dependencies.cms-3 = [
+  "django-cms<4",
+]
+optional-dependencies.cms-4 = [
+  "django-cms>=4.1",
+  "djangocms-versioning>=2",
+]
+
+[project.urls]
+Documentation = "https://djangocms-custom-content.readthedocs.io"
+Issues = "https://github.com/fsbraun/djangocms-custom-content/issues"
+Source = "https://github.com/fsbraun/djangocms-custom-content"
+
+[tool.setuptools]
+packages = [ "djangocms_custom_content" ]
+
+[tool.setuptools.dynamic]
+version = { attr = "djangocms_custom_content.__version__" }
+
+[tool.setuptools.package-data]
+djangocms_custom_content = [ "static/**/*", "templates/**/*", "locale/**/*", "LICENSE", "README.rst" ]
+
+[tool.black]
+exclude = '''
+  .git
+  .hg
+  .tox
+  venv
+  .venv
+  _build
+  build
+  dist
+'''
+
+[tool.ruff]
+line-length = 119
+exclude = [
+  "**/migrations/**",
+  ".env",
+  ".venv",
+]
+lint.select = [
+  "E",
+  "F",
+  "I",
+  "W",
+]
+
+lint.ignore = [
+  "E501", # line too long
+  "E701", # multiple statements on one line (colon)
+  "F401", # module imported but unused
+  "F403", # 'from module import *' used; unable to detect undefined names
+]
+
+[tool.isort]
+line_length = 119
+skip = [
+  "manage.py",
+  "*migrations*",
+  ".tox",
+  ".eggs",
+  ".env",
+  ".venv",
+  "data",
+]
+include_trailing_comma = true
+multi_line_output = 5
+lines_after_imports = 2
+default_section = "THIRDPARTY"
+sections = [
+  "FUTURE",
+  "STDLIB",
+  "DJANGO",
+  "CMS",
+  "THIRDPARTY",
+  "FIRSTPARTY",
+  "LOCALFOLDER",
+]
+known_first_party = "djangocms_custom_content"
+known_cms = [ "cms", "menus" ]
+known_django = "django"
+
+[tool.flake8]
+max-line-length = 120
+select = [
+  "C",
+  "E",
+  "F",
+  "W",
+  "B",
+  "B950",
+]
+ignore = [
+  "W503", # line break before binary operator
+]
+exclude = [
+  "*.egg-info",
+  ".eggs",
+  ".env",
+  ".git",
+  ".settings",
+  ".tox",
+  ".venv",
+  "build",
+  "data",
+  "dist",
+  "docs",
+  "*migrations*",
+  "requirements",
+  "tmp",
+]
+
+[tool.coverage.run]
+branch = true
+source = [ "djangocms_custom_content" ]
+omit = [
+  "djangocms_custom_content/migrations/*",
+  "djangocms_custom_content/management/*",
+  "tests/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "def __repr__",
+  "if self.debug:",
+  "if settings.DEBUG",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "if 0:",
+  "if __name__ == .__main__.:",
+]
+ignore_errors = true
+
+[tool.djlint]
+ignore = "H023,T003,H006,H031,D018,H021,H025"
+profile = "django"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.test_settings"
+python_files = ["test_*.py"]
+testpaths = ["tests"]

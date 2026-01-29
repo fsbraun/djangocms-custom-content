@@ -1,0 +1,33 @@
+ci:
+    autofix_commit_msg: |
+        ci: auto fixes from pre-commit hooks
+
+        for more information, see https://pre-commit.ci
+    autofix_prs: false
+    autoupdate_commit_msg: "ci: pre-commit autoupdate"
+    autoupdate_schedule: monthly
+
+repos:
+    - repo: https://github.com/asottile/pyupgrade
+      rev: v3.21.2
+      hooks:
+          - id: pyupgrade
+            args: ["--py310-plus"]
+
+    - repo: https://github.com/adamchainz/django-upgrade
+      rev: "1.29.1"
+      hooks:
+          - id: django-upgrade
+            args: [--target-version, "4.2"]
+
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.14.10
+      hooks:
+          - id: ruff
+            args: [--fix]
+          - id: ruff-format
+
+    - repo: https://github.com/tox-dev/pyproject-fmt
+      rev: v2.11.1
+      hooks:
+      - id: pyproject-fmt

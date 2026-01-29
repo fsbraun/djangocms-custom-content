@@ -1,0 +1,8 @@
+include LICENSE
+include README.rst
+recursive-include djangocms_custom_content/locale *
+recursive-include djangocms_custom_content/static *
+recursive-include djangocms_custom_content/templates *
+recursive-exclude * *.py[co]
+exclude docs/
+exclude tests/
