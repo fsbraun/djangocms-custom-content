@@ -1,0 +1,7 @@
+<ul class="dcc-categories">
+  {% for category in categories %}
+    <li class="dcc-categories__item">{{ category.title }}</li>
+  {% empty %}
+    <li class="dcc-categories__empty">No categories.</li>
+  {% endfor %}
+</ul>

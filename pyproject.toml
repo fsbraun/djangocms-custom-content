@@ -5,9 +5,9 @@ requires = [ "setuptools", "setuptools-scm" ]
 
 [project]
 name = "djangocms-custom-content"
-description = "Custom content plugin for django CMS providing flexible template-based content blocks."
+description = "Developer framework for integrating custom content models with django CMS."
 readme = "README.rst"
-license = {text = "BSD-3-Clause"}
+license = { text = "BSD-3-Clause" }
 authors = [
   { name = "Fabian Braun", email = "fsbraun@gmx.de" },
 ]
@@ -43,13 +43,19 @@ optional-dependencies.cms-4 = [
   "djangocms-versioning>=2",
 ]
 
-[project.urls]
-Documentation = "https://djangocms-custom-content.readthedocs.io"
-Issues = "https://github.com/fsbraun/djangocms-custom-content/issues"
-Source = "https://github.com/fsbraun/djangocms-custom-content"
+optional-dependencies.test = [
+  "pre-commit>=3",
+  "pytest>=7",
+  "pytest-django>=4",
+]
 
-[tool.setuptools]
-packages = [ "djangocms_custom_content" ]
+urls.Documentation = "https://djangocms-custom-content.readthedocs.io"
+urls.Issues = "https://github.com/fsbraun/djangocms-custom-content/issues"
+urls.Source = "https://github.com/fsbraun/djangocms-custom-content"
+
+[tool.setuptools.packages.find]
+where = [ "." ]
+include = [ "djangocms_custom_content*" ]
 
 [tool.setuptools.dynamic]
 version = { attr = "djangocms_custom_content.__version__" }
@@ -148,6 +154,11 @@ exclude = [
   "tmp",
 ]
 
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.test_settings"
+python_files = [ "test_*.py" ]
+testpaths = [ "tests" ]
+
 [tool.coverage.run]
 branch = true
 source = [ "djangocms_custom_content" ]
@@ -173,8 +184,3 @@ ignore_errors = true
 [tool.djlint]
 ignore = "H023,T003,H006,H031,D018,H021,H025"
 profile = "django"
-
-[tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "tests.test_settings"
-python_files = ["test_*.py"]
-testpaths = ["tests"]

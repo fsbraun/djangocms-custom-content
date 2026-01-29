@@ -14,12 +14,15 @@ class CustomContentPlugin(CMSPluginBase):
     allow_children = True
 
     fieldsets = [
-        (None, {
-            "fields": (
-                "template",
-                "content",
-            )
-        }),
+        (
+            None,
+            {
+                "fields": (
+                    "template",
+                    "content",
+                )
+            },
+        ),
     ]
 
     def render(self, context, instance, placeholder):
