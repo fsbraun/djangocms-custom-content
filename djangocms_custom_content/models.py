@@ -1,28 +1,16 @@
-from cms.models import CMSPlugin
+from cms.models.fields import PlaceholderRelationField
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 
 
-class CustomContent(CMSPlugin):
+class AbstractCustomContent(models.Model):
     """
-    Custom content plugin model for flexible template-based content blocks.
+    Abstract base model providing a PlaceholderRelationField for custom content.
+
+    Inherit from this model in your project to quickly add placeholder support
+    to your custom content types.
     """
 
-    template = models.CharField(
-        _("Template"),
-        max_length=255,
-        help_text=_("The template to use for rendering this content block."),
-    )
-
-    content = models.TextField(
-        _("Content"),
-        blank=True,
-        help_text=_("Custom content for this block."),
-    )
+    placeholders = PlaceholderRelationField()
 
     class Meta:
-        verbose_name = _("Custom Content")
-        verbose_name_plural = _("Custom Contents")
-
-    def __str__(self):
-        return self.template or str(self.pk)
+        abstract = True

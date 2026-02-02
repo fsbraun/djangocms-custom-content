@@ -158,6 +158,7 @@ exclude = [
 DJANGO_SETTINGS_MODULE = "tests.test_settings"
 python_files = [ "test_*.py" ]
 testpaths = [ "tests" ]
+pythonpath = [ "." ]
 
 [tool.coverage.run]
 branch = true
