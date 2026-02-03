@@ -12,6 +12,8 @@ INSTALLED_APPS = [
     "treebeard",
     "sekizai",
     "djangocms_custom_content",
+    "djangocms_custom_content.contrib.blog",
+    "djangocms_custom_content.contrib.people",
     "tests.test_app",
 ]
 

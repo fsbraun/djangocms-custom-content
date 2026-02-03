@@ -32,21 +32,14 @@ classifiers = [
 ]
 dynamic = [ "version" ]
 dependencies = [
-  "django-cms>=3.11",
-]
-
-optional-dependencies.cms-3 = [
-  "django-cms<4",
-]
-optional-dependencies.cms-4 = [
   "django-cms>=4.1",
-  "djangocms-versioning>=2",
 ]
 
 optional-dependencies.test = [
   "pre-commit>=3",
   "pytest>=7",
   "pytest-django>=4",
+  "djangocms-versioning",
 ]
 
 urls.Documentation = "https://djangocms-custom-content.readthedocs.io"

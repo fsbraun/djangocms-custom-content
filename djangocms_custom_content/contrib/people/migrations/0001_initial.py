@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('cms', '0042_remove_placeholderreference_placeholder_ref_and_more'),
+        ('cms', '0036_auto_20240311_1028'),
     ]
 
     operations = [
