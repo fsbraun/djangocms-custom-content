@@ -20,7 +20,6 @@ class CustomContentMixin:
     pass
 
 
-
 class AbstractCustomContent(CustomContentMixin, models.Model):
     """
     Abstract base model providing a PlaceholderRelationField for custom content.
@@ -28,6 +27,7 @@ class AbstractCustomContent(CustomContentMixin, models.Model):
     Inherit from this model in your project to quickly add placeholder support
     to your custom content types.
     """
+
     objects = CustomContentManager()
     placeholders = PlaceholderRelationField()
 

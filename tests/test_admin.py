@@ -1,14 +1,13 @@
 import pytest
 from django.contrib.admin.sites import site
 from django.contrib.auth import get_user_model
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from djangocms_custom_content.contrib.blog.admin import BlogPostAdmin
 from djangocms_custom_content.contrib.blog.models import Post, PostContent
 from djangocms_custom_content.contrib.people.admin import PersonAdmin
 from djangocms_custom_content.contrib.people.models import Person, PersonGrouper
-
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -20,12 +19,10 @@ class BlogAdminTestCase(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.superuser = User.objects.create_superuser(
-            username="admin",
-            email="admin@example.com",
-            password="password"
+            username="admin", email="admin@example.com", password="password"
         )
         self.admin = BlogPostAdmin(Post, site)
-        
+
         # Create test blog posts with user context for versioning
         self.post1 = Post.objects.create()
         self.post1_content = PostContent.objects.with_user(self.superuser).create(
@@ -35,9 +32,9 @@ class BlogAdminTestCase(TestCase):
             excerpt="This is the first post",
             body="Full content of the first post",
             language="en",
-            is_featured=True
+            is_featured=True,
         )
-        
+
         self.post2 = Post.objects.create()
         self.post2_content = PostContent.objects.with_user(self.superuser).create(
             post=self.post2,
@@ -46,7 +43,7 @@ class BlogAdminTestCase(TestCase):
             excerpt="This is the second post",
             body="Full content of the second post",
             language="en",
-            is_featured=False
+            is_featured=False,
         )
 
     def test_blog_admin_registered(self):
@@ -59,7 +56,7 @@ class BlogAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_blog_post_changelist")
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "First Blog Post")
         self.assertContains(response, "Second Blog Post")
@@ -69,7 +66,7 @@ class BlogAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_blog_post_change", args=[self.post1.pk])
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "First Blog Post")
 
@@ -78,7 +75,7 @@ class BlogAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_blog_post_add")
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
 
     def test_blog_list_display(self):
@@ -101,7 +98,7 @@ class BlogAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_blog_post_changelist")
         response = self.client.get(url, {"q": "First"})
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "First Blog Post")
         # Note: Search may return other results if they contain the search term
@@ -112,7 +109,7 @@ class BlogAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_blog_post_delete", args=[self.post1.pk])
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Are you sure")
 
@@ -120,16 +117,19 @@ class BlogAdminTestCase(TestCase):
         """Test creating a blog post via the admin interface."""
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_blog_post_add")
-        
+
         # Count existing posts
         initial_count = Post.objects.count()
-        
+
         # Note: This is a simplified test. In reality, the form would be more complex
         # with the content fields and versioning considerations
-        response = self.client.post(url, {
-            # Add appropriate form data here based on the actual admin form
-        })
-        
+        response = self.client.post(
+            url,
+            {
+                # Add appropriate form data here based on the actual admin form
+            },
+        )
+
         # The actual assertion would depend on the form structure
         # For now, we're just testing that the view is accessible
 
@@ -138,7 +138,7 @@ class BlogAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_blog_postcontent_changelist")
         response = self.client.get(url)
-        
+
         # Should redirect to the Post changelist
         self.assertEqual(response.status_code, 302)
 
@@ -149,27 +149,19 @@ class PeopleAdminTestCase(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.superuser = User.objects.create_superuser(
-            username="admin",
-            email="admin@example.com",
-            password="password"
+            username="admin", email="admin@example.com", password="password"
         )
         self.admin = PersonAdmin(PersonGrouper, site)
-        
+
         # Create test people with user context for versioning
         self.person_grouper1 = PersonGrouper.objects.create(slug="john-doe")
         self.person1 = Person.objects.with_user(self.superuser).create(
-            person_grouper=self.person_grouper1,
-            name="John Doe",
-            role="Developer",
-            bio="John is a talented developer"
+            person_grouper=self.person_grouper1, name="John Doe", role="Developer", bio="John is a talented developer"
         )
-        
+
         self.person_grouper2 = PersonGrouper.objects.create(slug="jane-smith")
         self.person2 = Person.objects.with_user(self.superuser).create(
-            person_grouper=self.person_grouper2,
-            name="Jane Smith",
-            role="Designer",
-            bio="Jane is a creative designer"
+            person_grouper=self.person_grouper2, name="Jane Smith", role="Designer", bio="Jane is a creative designer"
         )
 
     def test_person_admin_registered(self):
@@ -182,7 +174,7 @@ class PeopleAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_people_persongrouper_changelist")
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "John Doe")
         self.assertContains(response, "Jane Smith")
@@ -192,7 +184,7 @@ class PeopleAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_people_persongrouper_change", args=[self.person_grouper1.pk])
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "John Doe")
 
@@ -201,7 +193,7 @@ class PeopleAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_people_persongrouper_add")
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
 
     def test_person_list_display(self):
@@ -232,7 +224,7 @@ class PeopleAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_people_persongrouper_changelist")
         response = self.client.get(url, {"q": "John"})
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "John Doe")
         # Note: Search may return multiple results depending on search field configuration
@@ -242,7 +234,7 @@ class PeopleAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_people_persongrouper_changelist")
         response = self.client.get(url, {"q": "Developer"})
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "John Doe")
         # Note: Search may return multiple results depending on search field configuration
@@ -252,7 +244,7 @@ class PeopleAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_people_persongrouper_delete", args=[self.person_grouper1.pk])
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Are you sure")
 
@@ -261,14 +253,14 @@ class PeopleAdminTestCase(TestCase):
         self.client.login(username="admin", password="password")
         url = reverse("admin:djangocms_custom_content_people_person_changelist")
         response = self.client.get(url)
-        
+
         # Should redirect to the PersonGrouper changelist
         self.assertEqual(response.status_code, 302)
 
     def test_person_slug_uniqueness(self):
         """Test that person slugs must be unique."""
         self.client.login(username="admin", password="password")
-        
+
         # Try to create a person with duplicate slug
         with self.assertRaises(Exception):
             PersonGrouper.objects.create(slug="john-doe")
@@ -279,9 +271,7 @@ class CustomGrouperAdminMixinTestCase(TestCase):
 
     def setUp(self):
         self.superuser = User.objects.create_superuser(
-            username="admin",
-            email="admin@example.com",
-            password="password"
+            username="admin", email="admin@example.com", password="password"
         )
         self.blog_admin = BlogPostAdmin(Post, site)
         self.person_admin = PersonAdmin(PersonGrouper, site)
@@ -289,22 +279,22 @@ class CustomGrouperAdminMixinTestCase(TestCase):
     def test_custom_urls_exist_blog(self):
         """Test that custom URLs are added for blog admin."""
         urls = self.blog_admin.get_urls()
-        url_patterns = [url.pattern._route for url in urls if hasattr(url.pattern, '_route')]
-        
+        url_patterns = [url.pattern._route for url in urls if hasattr(url.pattern, "_route")]
+
         # Check for breadcrumb redirect URLs
-        self.assertTrue(any('breadcrumb_redir' in pattern for pattern in url_patterns))
+        self.assertTrue(any("breadcrumb_redir" in pattern for pattern in url_patterns))
 
     def test_custom_urls_exist_people(self):
         """Test that custom URLs are added for people admin."""
         urls = self.person_admin.get_urls()
-        url_patterns = [url.pattern._route for url in urls if hasattr(url.pattern, '_route')]
-        
+        url_patterns = [url.pattern._route for url in urls if hasattr(url.pattern, "_route")]
+
         # Check for breadcrumb redirect URLs
-        self.assertTrue(any('breadcrumb_redir' in pattern for pattern in url_patterns))
+        self.assertTrue(any("breadcrumb_redir" in pattern for pattern in url_patterns))
 
     def test_breadcrumb_redir_method_exists(self):
         """Test that breadcrumb_redir method exists on admin classes."""
-        self.assertTrue(hasattr(self.blog_admin, 'breadcrumb_redir'))
-        self.assertTrue(hasattr(self.person_admin, 'breadcrumb_redir'))
+        self.assertTrue(hasattr(self.blog_admin, "breadcrumb_redir"))
+        self.assertTrue(hasattr(self.person_admin, "breadcrumb_redir"))
         self.assertTrue(callable(self.blog_admin.breadcrumb_redir))
         self.assertTrue(callable(self.person_admin.breadcrumb_redir))
