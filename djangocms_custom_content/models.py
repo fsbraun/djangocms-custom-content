@@ -1,4 +1,5 @@
 from cms.models.fields import PlaceholderRelationField
+from cms.models.managers import WithUserMixin
 from django.db import models
 
 
@@ -11,8 +12,13 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
         abstract = True
 
 
+class CustomContentManager(WithUserMixin, models.Manager):
+    pass
+
+
 class CustomContentMixin:
     pass
+
 
 
 class AbstractCustomContent(CustomContentMixin, models.Model):
@@ -22,7 +28,7 @@ class AbstractCustomContent(CustomContentMixin, models.Model):
     Inherit from this model in your project to quickly add placeholder support
     to your custom content types.
     """
-
+    objects = CustomContentManager()
     placeholders = PlaceholderRelationField()
 
     class Meta:

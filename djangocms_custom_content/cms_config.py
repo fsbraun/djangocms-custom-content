@@ -15,7 +15,9 @@ class CustomContentConfig(CMSAppConfig):
 
         super().__init__(args, **wkargs)
         # Ensure admins are loaded
-        apps.get_app_config("admin").module.autodiscover()
+        admin_config = apps.get_app_config("admin")
+        if admin_config.module:
+            admin_config.module.autodiscover()
 
         self.init_config()
         all_models = apps.get_models()
