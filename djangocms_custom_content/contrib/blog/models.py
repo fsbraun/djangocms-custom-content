@@ -6,14 +6,14 @@ from django.utils.translation import gettext_lazy as _
 from djangocms_custom_content.models import AbstractCustomContent, AbstractCustomGrouper
 
 
-class Post(AbstractCustomGrouper):
+class BlogPost(AbstractCustomGrouper):
     pass
 
 
-class PostContent(AbstractCustomContent):
-    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+class BlogPostContent(AbstractCustomContent):
+    post = models.ForeignKey(BlogPost, on_delete=models.CASCADE)
     title = models.CharField(_("Title"), max_length=200)
-    slug = models.SlugField(_("Slug"), unique=True)
+    slug = models.SlugField(_("Slug"))  # Uniquness not enforced here to allow multple languages and versions
     excerpt = models.TextField(_("Excerpt"), blank=True)
     body = models.TextField(_("Body"), blank=True)
     published_at = models.DateTimeField(_("Published at"), default=timezone.now)
@@ -37,7 +37,7 @@ class PostContent(AbstractCustomContent):
 
 
 class BlogPostTeaser(CMSPlugin):
-    post = models.ForeignKey(Post, on_delete=models.PROTECT, related_name="plugins")
+    post = models.ForeignKey(BlogPost, on_delete=models.PROTECT, related_name="plugins")
 
     class Meta:
         verbose_name = _("Blog post teaser")

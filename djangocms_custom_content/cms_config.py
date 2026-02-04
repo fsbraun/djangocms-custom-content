@@ -28,6 +28,8 @@ class CustomContentConfig(CMSAppConfig):
     def init_config(self) -> None:
         self.cms_toolbar_enabled_models = []
         self.cms_apphook_dict = {}
+        self.custom_content_groupers = {}
+
         if hasattr(self, "get_contract"):
             self.versioning_contract = self.get_contract("djangocms_versioning")
             self.versioning = []
@@ -56,18 +58,15 @@ class CustomContentConfig(CMSAppConfig):
             ),
             "",
         )
+        grouper_model = model._meta.get_field(grouper_field_name).related_model
         has_language_field = any(f.name == "language" for f in model._meta.get_fields())
 
-        print(model.__name__, enable_frontend_editing, enable_versionig)
+        self.custom_content_groupers[model] = (grouper_model, grouper_field_name, has_language_field)
 
         if has_language_field:
             # Add extra_grouping_field to admin
-            grouper_model = model._meta.get_field(grouper_field_name).related_model
+            
             admin = admin_site._registry.get(grouper_model)
-            from pprint import pprint
-
-            print(grouper_model, admin)
-            pprint(admin_site._registry)
             if admin:
                 admin.__class__.extra_grouping_fields = ("language",)
 

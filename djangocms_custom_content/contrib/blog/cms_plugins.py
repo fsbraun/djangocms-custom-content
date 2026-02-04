@@ -2,7 +2,7 @@ from cms.plugin_base import CMSPluginBase
 from cms.plugin_pool import plugin_pool
 from django.utils.translation import gettext_lazy as _
 
-from .models import BlogPostTeaser, Post
+from .models import BlogPostTeaser
 
 
 @plugin_pool.register_plugin

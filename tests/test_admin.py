@@ -5,7 +5,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from djangocms_custom_content.contrib.blog.admin import BlogPostAdmin
-from djangocms_custom_content.contrib.blog.models import Post, PostContent
+from djangocms_custom_content.contrib.blog.models import BlogPost, BlogPostContent
 from djangocms_custom_content.contrib.people.admin import PersonAdmin
 from djangocms_custom_content.contrib.people.models import Person, PersonGrouper
 
@@ -21,11 +21,11 @@ class BlogAdminTestCase(TestCase):
         self.superuser = User.objects.create_superuser(
             username="admin", email="admin@example.com", password="password"
         )
-        self.admin = BlogPostAdmin(Post, site)
+        self.admin = BlogPostAdmin(BlogPost, site)
 
         # Create test blog posts with user context for versioning
-        self.post1 = Post.objects.create()
-        self.post1_content = PostContent.objects.with_user(self.superuser).create(
+        self.post1 = BlogPost.objects.create()
+        self.post1_content = BlogPostContent.objects.with_user(self.superuser).create(
             post=self.post1,
             title="First Blog Post",
             slug="first-blog-post",
@@ -35,8 +35,8 @@ class BlogAdminTestCase(TestCase):
             is_featured=True,
         )
 
-        self.post2 = Post.objects.create()
-        self.post2_content = PostContent.objects.with_user(self.superuser).create(
+        self.post2 = BlogPost.objects.create()
+        self.post2_content = BlogPostContent.objects.with_user(self.superuser).create(
             post=self.post2,
             title="Second Blog Post",
             slug="second-blog-post",
@@ -48,13 +48,13 @@ class BlogAdminTestCase(TestCase):
 
     def test_blog_admin_registered(self):
         """Test that the blog admin is properly registered."""
-        self.assertIn(Post, site._registry)
-        self.assertIsInstance(site._registry[Post], BlogPostAdmin)
+        self.assertIn(BlogPost, site._registry)
+        self.assertIsInstance(site._registry[BlogPost], BlogPostAdmin)
 
     def test_blog_changelist_view(self):
         """Test the blog admin changelist view."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_blog_post_changelist")
+        url = reverse("admin:djangocms_custom_content_blog_blogpost_changelist")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -64,7 +64,7 @@ class BlogAdminTestCase(TestCase):
     def test_blog_change_view(self):
         """Test the blog admin change view."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_blog_post_change", args=[self.post1.pk])
+        url = reverse("admin:djangocms_custom_content_blog_blogpost_change", args=[self.post1.pk])
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -73,7 +73,7 @@ class BlogAdminTestCase(TestCase):
     def test_blog_add_view(self):
         """Test the blog admin add view."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_blog_post_add")
+        url = reverse("admin:djangocms_custom_content_blog_blogpost_add")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -96,7 +96,7 @@ class BlogAdminTestCase(TestCase):
     def test_blog_search_functionality(self):
         """Test that search works in the changelist."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_blog_post_changelist")
+        url = reverse("admin:djangocms_custom_content_blog_blogpost_changelist")
         response = self.client.get(url, {"q": "First"})
 
         self.assertEqual(response.status_code, 200)
@@ -107,7 +107,7 @@ class BlogAdminTestCase(TestCase):
     def test_blog_delete_view(self):
         """Test the blog admin delete view."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_blog_post_delete", args=[self.post1.pk])
+        url = reverse("admin:djangocms_custom_content_blog_blogpost_delete", args=[self.post1.pk])
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -116,10 +116,10 @@ class BlogAdminTestCase(TestCase):
     def test_blog_post_creation_via_admin(self):
         """Test creating a blog post via the admin interface."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_blog_post_add")
+        url = reverse("admin:djangocms_custom_content_blog_blogpost_add")
 
         # Count existing posts
-        initial_count = Post.objects.count()
+        initial_count = BlogPost.objects.count()
 
         # Note: This is a simplified test. In reality, the form would be more complex
         # with the content fields and versioning considerations
@@ -136,7 +136,7 @@ class BlogAdminTestCase(TestCase):
     def test_blog_breadcrumb_redirect(self):
         """Test the breadcrumb redirect functionality."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_blog_postcontent_changelist")
+        url = reverse("admin:djangocms_custom_content_blog_blogpostcontent_changelist")
         response = self.client.get(url)
 
         # Should redirect to the Post changelist
@@ -273,7 +273,7 @@ class CustomGrouperAdminMixinTestCase(TestCase):
         self.superuser = User.objects.create_superuser(
             username="admin", email="admin@example.com", password="password"
         )
-        self.blog_admin = BlogPostAdmin(Post, site)
+        self.blog_admin = BlogPostAdmin(BlogPost, site)
         self.person_admin = PersonAdmin(PersonGrouper, site)
 
     def test_custom_urls_exist_blog(self):
