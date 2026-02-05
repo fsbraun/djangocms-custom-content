@@ -74,7 +74,7 @@ class CustomContentConfig(CMSAppConfig):
             # Add frontend editable models
             self.cms_toolbar_enabled_models.append((model, render_frontend_editor, grouper_field_name))
 
-        if enable_versionig and hasattr(self, "versioning_contract"):
+        if enable_versionig and getattr(self, "versioning_contract", None):
             # Add versioning enabled models
             self.versioning.append(
                 self.versioning_contract(

@@ -11,6 +11,11 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
     class Meta:
         abstract = True
 
+    def get_content(self, grouper_field_name: str):
+        return self.personcontent_set(manager="admin_manager").latest_content().first()
+
+    def get_admin_content(self): ...
+
 
 class CustomContentManager(WithUserMixin, models.Manager):
     pass

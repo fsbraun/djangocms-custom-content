@@ -1,19 +1,30 @@
 from cms.models import CMSPlugin
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from filer.fields.image import FilerImageField
 
 from djangocms_custom_content.models import AbstractCustomContent, AbstractCustomGrouper
 
-
-class PersonGrouper(AbstractCustomGrouper):
-    slug = models.SlugField(_("Slug"), unique=True)
+User = get_user_model()
 
 
-class Person(AbstractCustomContent):
-    name = models.CharField(_("Name"), max_length=200)
-    role = models.CharField(_("Role"), max_length=200, blank=True)
-    bio = models.TextField(_("Bio"), blank=True)
-    person_grouper = models.ForeignKey(PersonGrouper, on_delete=models.CASCADE)
+class Person(AbstractCustomGrouper):
+    user = models.OneToOneField(User, null=True, blank=True, related_name="persons", on_delete=models.CASCADE)
+
+
+class PersonContent(AbstractCustomContent):
+    person = models.ForeignKey(Person, on_delete=models.CASCADE)
+    slug = models.SlugField(_("slug"), unique=True)
+    name = models.CharField(_("name"), max_length=200, blank=False)
+    role = models.CharField(_("role"), max_length=200, blank=True)
+    description = models.TextField(_("description"), blank=True)
+    phone = models.CharField(verbose_name=_("phone"), null=True, blank=True, max_length=100)
+    mobile = models.CharField(verbose_name=_("mobile"), null=True, blank=True, max_length=100)
+    fax = models.CharField(verbose_name=_("fax"), null=True, blank=True, max_length=100)
+    email = models.EmailField(verbose_name=_("email"), blank=True, default="")
+    website = models.URLField(verbose_name=_("website"), null=True, blank=True)
+    visual = FilerImageField(null=True, blank=True, default=None, on_delete=models.SET_NULL)
 
     class Meta:
         verbose_name = _("Person")
