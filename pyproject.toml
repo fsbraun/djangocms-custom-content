@@ -46,15 +46,15 @@ urls.Documentation = "https://djangocms-custom-content.readthedocs.io"
 urls.Issues = "https://github.com/fsbraun/djangocms-custom-content/issues"
 urls.Source = "https://github.com/fsbraun/djangocms-custom-content"
 
-[tool.setuptools.packages.find]
-where = [ "." ]
-include = [ "djangocms_custom_content*" ]
-
 [tool.setuptools.dynamic]
 version = { attr = "djangocms_custom_content.__version__" }
 
 [tool.setuptools.package-data]
 djangocms_custom_content = [ "static/**/*", "templates/**/*", "locale/**/*", "LICENSE", "README.rst" ]
+
+[tool.setuptools.packages.find]
+where = [ "." ]
+include = [ "djangocms_custom_content*" ]
 
 [tool.black]
 exclude = '''
@@ -153,15 +153,6 @@ python_files = [ "test_*.py" ]
 testpaths = [ "tests" ]
 pythonpath = [ "." ]
 
-[tool.coverage.run]
-branch = true
-source = [ "djangocms_custom_content" ]
-omit = [
-  "djangocms_custom_content/migrations/*",
-  "djangocms_custom_content/management/*",
-  "tests/*",
-]
-
 [tool.coverage.report]
 exclude_lines = [
   "pragma: no cover",
@@ -174,6 +165,15 @@ exclude_lines = [
   "if __name__ == .__main__.:",
 ]
 ignore_errors = true
+
+[tool.coverage.run]
+branch = true
+source = [ "djangocms_custom_content" ]
+omit = [
+  "djangocms_custom_content/migrations/*",
+  "djangocms_custom_content/management/*",
+  "tests/*",
+]
 
 [tool.djlint]
 ignore = "H023,T003,H006,H031,D018,H021,H025"
