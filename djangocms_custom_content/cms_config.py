@@ -65,7 +65,7 @@ class CustomContentConfig(CMSAppConfig):
 
         if has_language_field:
             # Add extra_grouping_field to admin
-            
+
             admin = admin_site._registry.get(grouper_model)
             if admin:
                 admin.__class__.extra_grouping_fields = ("language",)
