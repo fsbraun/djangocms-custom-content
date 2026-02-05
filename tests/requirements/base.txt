@@ -8,4 +8,5 @@ pyflakes>=2.1
 wheel
 black
 pre-commit
+djangocms-versioning @ git+https://github.com/django-cms/djangocms-versioning
 -e .
