@@ -209,6 +209,7 @@ class PeopleAdminTestCase(TestCase):
         expected_fields = ("content__name", "content__role")
         self.assertEqual(self.admin.list_display, expected_fields)
 
+    @skipIf(DJANGCMS_4_1, "Search supported since django CMS 5")
     def test_person_search_fields(self):
         """Test that search fields are properly configured."""
         expected_fields = ("content__name", "content__role", "content__bio")
@@ -227,6 +228,7 @@ class PeopleAdminTestCase(TestCase):
         """Test that the grouper_field_name attribute is set correctly."""
         self.assertEqual(self.admin.grouper_field_name, "person_grouper")
 
+    @skipIf(DJANGCMS_4_1, "Search supported since django CMS 5")
     def test_person_search_functionality(self):
         """Test that search works in the changelist."""
         self.client.login(username="admin", password="password")
@@ -237,6 +239,7 @@ class PeopleAdminTestCase(TestCase):
         self.assertContains(response, "John Doe")
         # Note: Search may return multiple results depending on search field configuration
 
+    @skipIf(DJANGCMS_4_1, "Search supported since django CMS 5")
     def test_person_search_by_role(self):
         """Test that search works for role field."""
         self.client.login(username="admin", password="password")
