@@ -1,4 +1,7 @@
+from unittest import skipIf
+
 import pytest
+from cms import __version__ as cms_version
 from django.contrib.admin.sites import site
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
@@ -11,6 +14,8 @@ from djangocms_custom_content.contrib.people.models import Person, PersonGrouper
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
+
+DJANGCMS_4_1 = cms_version < "5.0"
 
 
 class BlogAdminTestCase(TestCase):
@@ -83,16 +88,19 @@ class BlogAdminTestCase(TestCase):
         expected_fields = ("content__title", "content__published_at", "content__is_featured")
         self.assertEqual(self.admin.list_display, expected_fields)
 
+    @skipIf(DJANGCMS_4_1, "Search supported since django CMS 5")
     def test_blog_search_fields(self):
         """Test that search fields are properly configured."""
         expected_fields = ("content__title", "content__excerpt", "content__body")
         self.assertEqual(self.admin.search_fields, expected_fields)
 
+    @skipIf(DJANGCMS_4_1, "Search supported since django CMS 5")
     def test_blog_prepopulated_fields(self):
         """Test that prepopulated fields are properly configured."""
         expected = {"content__slug": ("content__title",)}
         self.assertEqual(self.admin.prepopulated_fields, expected)
 
+    @skipIf(DJANGCMS_4_1, "Search supported since django CMS 5")
     def test_blog_search_functionality(self):
         """Test that search works in the changelist."""
         self.client.login(username="admin", password="password")
@@ -119,11 +127,11 @@ class BlogAdminTestCase(TestCase):
         url = reverse("admin:djangocms_custom_content_blog_blogpost_add")
 
         # Count existing posts
-        initial_count = BlogPost.objects.count()
+        BlogPost.objects.count()
 
         # Note: This is a simplified test. In reality, the form would be more complex
         # with the content fields and versioning considerations
-        response = self.client.post(
+        self.client.post(
             url,
             {
                 # Add appropriate form data here based on the actual admin form

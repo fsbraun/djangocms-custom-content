@@ -261,7 +261,7 @@ class CustomContentToolbarTestCase(TestCase):
         """Test that shortcut links are added to admin menu for all custom content types."""
         # Superuser should have all permissions
         toolbar = self.get_toolbar(self.post_content, self.superuser)
-        
+
         # Populate the toolbar to trigger add_shortcut_links
         toolbar.populate()
 
@@ -274,11 +274,11 @@ class CustomContentToolbarTestCase(TestCase):
         # Check that shortcuts were added - get all items with names
         all_items = list(admin_menu.get_items())
         menu_items = [item for item in all_items if hasattr(item, "name")]
-        
+
         # Superuser should have access, so shortcuts should be added
         # Look for blog and person shortcuts
         item_names = [str(item.name).lower() for item in menu_items]
-        
+
         # At least one of the custom content types should be added as shortcut
         has_custom_content = any("blog" in name or "people" in name or "person" in name for name in item_names)
         self.assertTrue(has_custom_content, f"Expected custom content shortcuts in menu. Found: {item_names}")
@@ -301,7 +301,9 @@ class CustomContentToolbarTestCase(TestCase):
 
         # Should not have custom content shortcuts without permissions
         has_custom_content = any("blog" in name or "people" in name or "person" in name for name in item_names)
-        self.assertFalse(has_custom_content, f"Should not have custom content shortcuts without permissions. Found: {item_names}")
+        self.assertFalse(
+            has_custom_content, f"Should not have custom content shortcuts without permissions. Found: {item_names}"
+        )
 
     def test_add_shortcut_links_with_view_permission(self):
         """Test that shortcut links are added when user has view permissions."""
