@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 optional-dependencies.test = [
-  "git+https://github.com/django-cms/djangocms-versioning",
+  "djangocms-versioning @ git+https://github.com/django-cms/djangocms-versioning",
   "pre-commit>=3",
   "pytest>=7",
   "pytest-django>=4",
