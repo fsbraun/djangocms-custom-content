@@ -67,17 +67,6 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
             language or get_language(), self._content_set(manager="admin_manager").latest_content()
         )
 
-    @classmethod
-    def resolve_content(cls, **kwargs) -> models.Model | None:
-        """Resolves the content for this grouper, only serving public content if available."""
-        if cls._content_set is None:
-            return None
-
-        if cls._has_language_field:
-            language = kwargs.get("language") or get_language()
-            return cls._content_set.filter(language=language, **kwargs).first()
-        return cls._content_set.filter(**kwargs).first()
-
 
 class CustomContentManager(WithUserMixin, models.Manager):
     pass
