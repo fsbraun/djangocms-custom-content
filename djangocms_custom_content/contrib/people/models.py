@@ -12,10 +12,14 @@ User = get_user_model()
 class Person(AbstractCustomGrouper):
     user = models.OneToOneField(User, null=True, blank=True, related_name="persons", on_delete=models.CASCADE)
 
+    def __str__(self):
+        if self.pk:
+            return self.get_admin_content().name if self.get_admin_content() else str(self.pk)
+        return "unsaved"
 
 class PersonContent(AbstractCustomContent):
     person = models.ForeignKey(Person, on_delete=models.CASCADE)
-    slug = models.SlugField(_("slug"), unique=True)
+    slug = models.SlugField(_("slug"))
     name = models.CharField(_("name"), max_length=200, blank=False)
     role = models.CharField(_("role"), max_length=200, blank=True)
     description = models.TextField(_("description"), blank=True)
@@ -34,9 +38,7 @@ class PersonContent(AbstractCustomContent):
     class CMSConfig:
         enable_versioning = True
         enable_frontend_editing = True
-
-    def get_template(self):
-        return "people/detail.html"
+        apphook = True
 
     def __str__(self):
         return self.name

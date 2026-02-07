@@ -9,7 +9,7 @@ from .models import PersonTeaser
 class PersonTeaserPlugin(CMSPluginBase):
     model = PersonTeaser
     name = _("Person")
-    render_template = "people/person_teaser.html"
+    render_template = "djangocms_custom_content_people/person_teaser.html"
     allow_children = False
     grouper_field = "person"
 
@@ -17,5 +17,5 @@ class PersonTeaserPlugin(CMSPluginBase):
 
     def render(self, context, instance, placeholder):
         context = super().render(context, instance, placeholder)
-        context["person_content"] = instance.person.get_content(self.grouper_field)
+        context["personcontent"] = instance.person.get_content()
         return context

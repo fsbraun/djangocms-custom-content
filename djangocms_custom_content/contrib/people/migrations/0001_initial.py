@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
             name='PersonContent',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('slug', models.SlugField(unique=True, verbose_name='slug')),
+                ('slug', models.SlugField(verbose_name='slug')),
                 ('name', models.CharField(max_length=200, verbose_name='name')),
                 ('role', models.CharField(blank=True, max_length=200, verbose_name='role')),
                 ('description', models.TextField(blank=True, verbose_name='description')),
