@@ -17,6 +17,7 @@ class Person(AbstractCustomGrouper):
             return self.get_admin_content().name if self.get_admin_content() else str(self.pk)
         return "unsaved"
 
+
 class PersonContent(AbstractCustomContent):
     person = models.ForeignKey(Person, on_delete=models.CASCADE)
     slug = models.SlugField(_("slug"))

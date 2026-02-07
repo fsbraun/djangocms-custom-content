@@ -41,7 +41,7 @@ class CustomGrouperAdminMixin:
 
     def breadcrumb_redir(self, request, *args, **kwargs):
         """djangocms-versioning uses content admin urls for breadcrumbs, but
-        we use grouper admin classes and want to redirect to the grouper 
+        we use grouper admin classes and want to redirect to the grouper
         admin urls instead."""
         id = kwargs.get("slug")
         info = f"{self.model._meta.app_label}_{self.model._meta.model_name}"

@@ -1,4 +1,5 @@
-from typing import Callable
+from collections.abc import Callable
+
 from cms.app_base import CMSApp, CMSAppConfig
 from cms.apphook_pool import apphook_pool
 from cms.utils import get_current_site
@@ -14,6 +15,7 @@ from djangocms_custom_content.views import custom_detail_view_factory
 def _get_absolute_url_factory(app_name: str, slug_field: str, view_name: str) -> Callable:
     def _get_absolute_url(self) -> str:
         return reverse(f"{app_name}:{view_name}", kwargs={slug_field: getattr(self, slug_field)})
+
     return _get_absolute_url
 
 
@@ -52,7 +54,7 @@ class CustomContentConfig(CMSAppConfig):
                 self.versioning = []
             except ImportError:
                 pass
-        
+
     def register_extra_grouping_field(self, grouper_model: type[models.Model]):
         # Add extra_grouping_field to admin
 
@@ -94,7 +96,6 @@ class CustomContentConfig(CMSAppConfig):
         cms_config = getattr(model, "CMSConfig", None)
         apphook = getattr(cms_config, "apphook", None)
         if apphook:
-            
             detail_view = custom_detail_view_factory(model).as_view()
             has_slug_field = model._meta.get_field("slug") is not None
 
@@ -112,12 +113,16 @@ class CustomContentConfig(CMSAppConfig):
             apphook_pool.register(apphook)
 
             if not hasattr(model, "get_absolute_url"):
-                model.add_to_class("get_absolute_url", _get_absolute_url_factory(grouper_model_name.lower(), "slug" if has_slug_field else "pk", "detail"))
-
+                model.add_to_class(
+                    "get_absolute_url",
+                    _get_absolute_url_factory(
+                        grouper_model_name.lower(), "slug" if has_slug_field else "pk", "detail"
+                    ),
+                )
 
     def register(self, model: type[models.Model]):
         from djangocms_custom_content.models import AbstractCustomGrouper
-    
+
         grouper_field_name = next(
             (
                 f.name
@@ -137,4 +142,3 @@ class CustomContentConfig(CMSAppConfig):
         self.register_frontend_editing(model, grouper_field_name)
         self.register_versioning(model, grouper_field_name, has_language_field)
         self.register_apphook(model, grouper_model.__name__)
- 

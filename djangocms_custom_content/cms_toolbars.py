@@ -46,7 +46,7 @@ class CustomContentToolbar(CMSToolbar):
             else:
                 admin_menu.add_break(SHORTCUTS_BREAK, position=end.index)
                 start = admin_menu.find_first(Break, identifier=SHORTCUTS_BREAK)
-        
+
         end = admin_menu.find_first(Break, identifier=ADMINISTRATION_BREAK)
         if not end:
             # If ADMINISTRATION_BREAK doesn't exist, add it after SHORTCUTS_BREAK

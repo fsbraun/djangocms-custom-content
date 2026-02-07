@@ -10,7 +10,7 @@ class CustomDetailViewMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.grouper_field_name = get_custom_config(self.model)[1]
-        
+
     def get_queryset(self):
         """Override the default queryset to prefetch content for the grouper."""
         return super().get_queryset().select_related(self.grouper_field_name)
@@ -35,7 +35,7 @@ def custom_detail_view_factory(model: type[models.Model]) -> type[DetailView]:
         {
             "model": model,
             "grouper_field_name": getattr(model, "_grouper_field_name", None),
-        }
+        },
     )
 
 
