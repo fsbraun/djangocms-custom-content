@@ -10,7 +10,7 @@ from django.urls import reverse
 from djangocms_custom_content.contrib.blog.admin import BlogPostAdmin
 from djangocms_custom_content.contrib.blog.models import BlogPost, BlogPostContent
 from djangocms_custom_content.contrib.people.admin import PersonAdmin
-from djangocms_custom_content.contrib.people.models import Person, PersonGrouper
+from djangocms_custom_content.contrib.people.models import Person, PersonContent
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -159,28 +159,36 @@ class PeopleAdminTestCase(TestCase):
         self.superuser = User.objects.create_superuser(
             username="admin", email="admin@example.com", password="password"
         )
-        self.admin = PersonAdmin(PersonGrouper, site)
+        self.admin = PersonAdmin(Person, site)
 
         # Create test people with user context for versioning
-        self.person_grouper1 = PersonGrouper.objects.create(slug="john-doe")
-        self.person1 = Person.objects.with_user(self.superuser).create(
-            person_grouper=self.person_grouper1, name="John Doe", role="Developer", bio="John is a talented developer"
+        self.person1 = Person.objects.create()
+        self.person1_content = PersonContent.objects.with_user(self.superuser).create(
+            person=self.person1,
+            name="John Doe",
+            role="Developer",
+            description="John is a talented developer",
+            slug="john-doe",
         )
 
-        self.person_grouper2 = PersonGrouper.objects.create(slug="jane-smith")
-        self.person2 = Person.objects.with_user(self.superuser).create(
-            person_grouper=self.person_grouper2, name="Jane Smith", role="Designer", bio="Jane is a creative designer"
+        self.person2 = Person.objects.create()
+        self.person2_content = PersonContent.objects.with_user(self.superuser).create(
+            person=self.person2,
+            name="Jane Smith",
+            role="Designer",
+            description="Jane is a creative designer",
+            slug="jane-smith",
         )
 
     def test_person_admin_registered(self):
         """Test that the person admin is properly registered."""
-        self.assertIn(PersonGrouper, site._registry)
-        self.assertIsInstance(site._registry[PersonGrouper], PersonAdmin)
+        self.assertIn(Person, site._registry)
+        self.assertIsInstance(site._registry[Person], PersonAdmin)
 
     def test_person_changelist_view(self):
         """Test the person admin changelist view."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_people_persongrouper_changelist")
+        url = reverse("admin:djangocms_custom_content_people_person_changelist")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -190,7 +198,7 @@ class PeopleAdminTestCase(TestCase):
     def test_person_change_view(self):
         """Test the person admin change view."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_people_persongrouper_change", args=[self.person_grouper1.pk])
+        url = reverse("admin:djangocms_custom_content_people_person_change", args=[self.person1.pk])
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -199,40 +207,40 @@ class PeopleAdminTestCase(TestCase):
     def test_person_add_view(self):
         """Test the person admin add view."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_people_persongrouper_add")
+        url = reverse("admin:djangocms_custom_content_people_person_add")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
 
     def test_person_list_display(self):
         """Test that list_display fields are properly configured."""
-        expected_fields = ("content__name", "content__role")
+        expected_fields = ("content__name", "content__visual", "content__role")
         self.assertEqual(self.admin.list_display, expected_fields)
 
     @skipIf(DJANGCMS_4_1, "Search supported since django CMS 5")
     def test_person_search_fields(self):
         """Test that search fields are properly configured."""
-        expected_fields = ("content__name", "content__role", "content__bio")
+        expected_fields = ("content__name", "content__role", "content__description")
         self.assertEqual(self.admin.search_fields, expected_fields)
 
     def test_person_prepopulated_fields(self):
         """Test that prepopulated fields are properly configured."""
-        expected = {"slug": ("content__name",)}
+        expected = {"content__slug": ("content__name",)}
         self.assertEqual(self.admin.prepopulated_fields, expected)
 
     def test_person_content_model_attribute(self):
         """Test that the content_model attribute is set correctly."""
-        self.assertEqual(self.admin.content_model, Person)
+        self.assertEqual(self.admin.content_model, PersonContent)
 
     def test_person_grouper_field_name_attribute(self):
         """Test that the grouper_field_name attribute is set correctly."""
-        self.assertEqual(self.admin.grouper_field_name, "person_grouper")
+        self.assertEqual(self.admin.grouper_field_name, "person")
 
     @skipIf(DJANGCMS_4_1, "Search supported since django CMS 5")
     def test_person_search_functionality(self):
         """Test that search works in the changelist."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_people_persongrouper_changelist")
+        url = reverse("admin:djangocms_custom_content_people_person_changelist")
         response = self.client.get(url, {"q": "John"})
 
         self.assertEqual(response.status_code, 200)
@@ -243,7 +251,7 @@ class PeopleAdminTestCase(TestCase):
     def test_person_search_by_role(self):
         """Test that search works for role field."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_people_persongrouper_changelist")
+        url = reverse("admin:djangocms_custom_content_people_person_changelist")
         response = self.client.get(url, {"q": "Developer"})
 
         self.assertEqual(response.status_code, 200)
@@ -253,7 +261,7 @@ class PeopleAdminTestCase(TestCase):
     def test_person_delete_view(self):
         """Test the person admin delete view."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_people_persongrouper_delete", args=[self.person_grouper1.pk])
+        url = reverse("admin:djangocms_custom_content_people_person_delete", args=[self.person1.pk])
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -262,19 +270,24 @@ class PeopleAdminTestCase(TestCase):
     def test_person_breadcrumb_redirect(self):
         """Test the breadcrumb redirect functionality."""
         self.client.login(username="admin", password="password")
-        url = reverse("admin:djangocms_custom_content_people_person_changelist")
+        url = reverse("admin:djangocms_custom_content_people_personcontent_changelist")
         response = self.client.get(url)
 
-        # Should redirect to the PersonGrouper changelist
+        # Should redirect to the Person changelist
         self.assertEqual(response.status_code, 302)
 
     def test_person_slug_uniqueness(self):
         """Test that person slugs must be unique."""
         self.client.login(username="admin", password="password")
 
-        # Try to create a person with duplicate slug
-        with self.assertRaises(Exception):
-            PersonGrouper.objects.create(slug="john-doe")
+        person = Person.objects.create()
+        PersonContent.objects.with_user(self.superuser).create(
+            person=person,
+            name="John Doe 2",
+            role="Developer",
+            description="Another person",
+            slug="john-doe",
+        )
 
 
 class CustomGrouperAdminMixinTestCase(TestCase):
@@ -285,7 +298,7 @@ class CustomGrouperAdminMixinTestCase(TestCase):
             username="admin", email="admin@example.com", password="password"
         )
         self.blog_admin = BlogPostAdmin(BlogPost, site)
-        self.person_admin = PersonAdmin(PersonGrouper, site)
+        self.person_admin = PersonAdmin(Person, site)
 
     def test_custom_urls_exist_blog(self):
         """Test that custom URLs are added for blog admin."""

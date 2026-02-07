@@ -96,6 +96,7 @@ class CustomContentConfig(CMSAppConfig):
         if apphook:
             
             detail_view = custom_detail_view_factory(model).as_view()
+            has_slug_field = model._meta.get_field("slug") is not None
 
             apphook = type(CMSApp)(
                 f"{grouper_model_name}App",
@@ -104,14 +105,14 @@ class CustomContentConfig(CMSAppConfig):
                     "name": f"{grouper_model_name}",
                     "app_name": grouper_model_name.lower(),
                     "get_urls": lambda self, page=None, language=None, **kwargs: [
-                        path("<slug:slug>/", detail_view, name="detail"),
+                        path("<slug:slug>/" if has_slug_field else "<int:pk>/", detail_view, name="detail"),
                     ],
                 },
             )
             apphook_pool.register(apphook)
 
             if not hasattr(model, "get_absolute_url"):
-                model.add_to_class("get_absolute_url", _get_absolute_url_factory(grouper_model_name.lower(), "slug", "detail"))
+                model.add_to_class("get_absolute_url", _get_absolute_url_factory(grouper_model_name.lower(), "slug" if has_slug_field else "pk", "detail"))
 
 
     def register(self, model: type[models.Model]):

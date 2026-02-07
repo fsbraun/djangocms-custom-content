@@ -8,7 +8,7 @@ from django.urls import reverse
 
 from djangocms_custom_content.cms_toolbars import CustomContentToolbar
 from djangocms_custom_content.contrib.blog.models import BlogPost, BlogPostContent
-from djangocms_custom_content.contrib.people.models import Person, PersonGrouper
+from djangocms_custom_content.contrib.people.models import Person, PersonContent
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -39,12 +39,13 @@ class CustomContentToolbarTestCase(TestCase):
         )
 
         # Create test person with user context for versioning
-        self.person_grouper = PersonGrouper.objects.create(slug="john-doe")
-        self.person = Person.objects.with_user(self.superuser).create(
-            person_grouper=self.person_grouper,
+        self.person = Person.objects.create()
+        self.person_content = PersonContent.objects.with_user(self.superuser).create(
+            person=self.person,
             name="John Doe",
             role="Developer",
-            bio="Test bio",
+            description="Test bio",
+            slug="john-doe",
         )
 
     def get_toolbar(self, content, user, edit_mode=True):
@@ -77,11 +78,11 @@ class CustomContentToolbarTestCase(TestCase):
 
     def test_toolbar_populates_for_person(self):
         """Test that toolbar populates for person content."""
-        toolbar = self.get_toolbar(self.person, self.superuser)
+        toolbar = self.get_toolbar(self.person_content, self.superuser)
         toolbar.populate()
 
         # Check that grouper was set
-        self.assertEqual(toolbar.grouper, self.person_grouper)
+        self.assertEqual(toolbar.grouper, self.person)
 
     def test_toolbar_does_not_populate_for_non_content(self):
         """Test that toolbar doesn't populate for non-custom content objects."""
@@ -223,14 +224,14 @@ class CustomContentToolbarTestCase(TestCase):
 
     def test_toolbar_for_person_grouper(self):
         """Test that toolbar works correctly for Person model."""
-        toolbar = self.get_toolbar(self.person, self.superuser)
+        toolbar = self.get_toolbar(self.person_content, self.superuser)
         toolbar.populate()
 
         # Check that grouper was set correctly
-        self.assertEqual(toolbar.grouper, self.person_grouper)
+        self.assertEqual(toolbar.grouper, self.person)
 
         # Check that menu exists
-        menu = toolbar.toolbar.menus.get(f"custom-content-{self.person_grouper._meta.model_name}")
+        menu = toolbar.toolbar.menus.get(f"custom-content-{self.person._meta.model_name}")
         self.assertIsNotNone(menu)
 
         # Check menu has at least 3 items
