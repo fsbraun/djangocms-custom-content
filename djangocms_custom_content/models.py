@@ -2,9 +2,13 @@ from collections.abc import Callable
 
 from cms.models.fields import PlaceholderRelationField
 from cms.models.managers import WithUserMixin
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.db.models.base import ModelBase
 from django.db.models.fields.reverse_related import ForeignObjectRel
 from django.utils.translation import get_language
+from django.utils.translation import gettext_lazy as _
 
 from djangocms_custom_content.helpers import get_custom_config
 
@@ -102,3 +106,130 @@ class AbstractCustomContent(CustomContentMixin, models.Model):
             object_meta.model_name,
             self.template_name_suffix,
         )
+
+
+class AbstractCustomRelation(models.Model):
+    """
+    Abstract base model to define the relation between a custom grouper and content.
+
+    This model should be used when the relation between the grouper and content
+    models is not a simple ForeignKey, for example when using a ManyToManyField
+    or when additional fields are needed on the relation.
+    """
+
+    class Meta:
+        abstract = True
+
+    # Generic foreign key to any model
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        verbose_name=_("content type"),
+    )
+    object_id = models.PositiveIntegerField(
+        _("object id"),
+    )
+    content_object = GenericForeignKey("content_type", "object_id")
+
+    instance = None  # This will be set to the related grouper instance when the relation is accessed
+
+    def __str__(self) -> str:
+        return f"{self.instance} -> {self.content_object}"
+
+
+class _InverseRelationManager:
+    def __init__(self, instance, relation_model):
+        self.instance = instance
+        self.relation_model = relation_model
+
+    def add(self, obj):
+        ct = ContentType.objects.get_for_model(obj)
+        self.relation_model.objects.get_or_create(
+            instance=self.instance,
+            content_type=ct,
+            object_id=obj.pk,
+        )
+
+    def remove(self, obj):
+        ct = ContentType.objects.get_for_model(obj)
+        self.relation_model.objects.filter(
+            instance=self.instance,
+            content_type=ct,
+            object_id=obj.pk,
+        ).delete()
+
+    def all(self):
+        return [
+            rel.content_object
+            for rel in self.relation_model.objects.filter(instance=self.instance).select_related("content_type")
+        ]
+
+
+class InverseRelationDescriptor:
+    def __init__(self, relation_model: type[models.Model]):
+        self.relation_model = relation_model
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        print(owner)
+        return _InverseRelationManager(instance, self.relation_model)
+
+
+class _GenericRelationManager:
+    def __init__(self, instance, relation_model, owner):
+        self.instance = instance
+        self.relation_model = relation_model
+        self.owner = owner
+
+    def add(self, obj):
+        ct = ContentType.objects.get_for_model(self.owner)
+        self.relation_model.objects.get_or_create(
+            instance=self.instance,
+            content_type=ct,
+            object_id=self.owner.pk,
+        )
+
+    def remove(self, obj):
+        ct = ContentType.objects.get_for_model(self.owner)
+        self.relation_model.objects.filter(
+            instance=self.instance,
+            content_type=ct,
+            object_id=self.owner.pk,
+        ).delete()
+
+    def all(self):
+        return [
+            rel.instance
+            for rel in self.relation_model.objects.filter(content_object=self.instance).select_related("instance")
+        ]
+
+
+class GenericRelationDescriptor:
+    def __init__(self, relation_model: type[models.Model]):
+        self.relation_model = relation_model
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return _GenericRelationManager(instance, self.relation_model, owner)
+
+
+def custom_relation_factory(model: type[models.Model], related_name: str | None = None) -> type[models.Model]:
+    relation_model = ModelBase(
+        f"{model.__name__}Relation",
+        (AbstractCustomRelation,),
+        {
+            "instance": models.ForeignKey(
+                model,
+                on_delete=models.CASCADE,
+                related_name="+",
+            ),
+            "__module__": model.__module__,
+        },
+    )
+    if related_name is None:
+        related_name = "relation_set"
+
+    model.add_to_class(related_name, InverseRelationDescriptor(relation_model))
+    return relation_model
