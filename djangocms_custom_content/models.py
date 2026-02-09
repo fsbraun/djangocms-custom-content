@@ -20,7 +20,7 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
     _content_set = None
     _has_language_field = False
     _content_cache: models.Model | dict[str, models.Model] | None = None
-    _admin_cache = None
+    _is_admin_cache = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,23 +46,26 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
 
         if self._has_language_field:
             if self._content_cache is None:
-                if hasattr(self, "_content_prefetch_cache"):
-                    self._content_cache = {obj.language: obj for obj in self._content_prefetch_cache}
-                else:
-                    self._content_cache = {obj.language: obj for obj in qs}
+                self._content_cache = {obj.language: obj for obj in qs}
             return self._content_cache.get(language)
 
         if self._content_cache is None:
-            if hasattr(self, "_content_prefetch_cache"):
-                self._content_cache = self._content_prefetch_cache[0]
-            else:
-                self._content_cache = qs.first()
+            self._content_cache = qs.first()
         return self._content_cache
 
     def get_content(self, language: str | None = None) -> models.Model | None:
+        if self._is_admin_cache:
+            self._is_admin_cache = False
+            self._content_cache = None
         return self._get_content(language or get_language(), self._content_set)
 
     def get_admin_content(self, language: str | None = None) -> models.Model | None:
+        if hasattr(self, "_admin_prefetch_cache") and not self._is_admin_cache:
+            if self._has_language_field is None:
+                self._content_cache = {obj.language: obj for obj in self._admin_prefetch_cache}
+            else:
+                self._content_cache = self._admin_prefetch_cache[0]
+        self._is_admin_cache = True
         return self._get_content(
             language or get_language(), self._content_set(manager="admin_manager").latest_content()
         )

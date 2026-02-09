@@ -26,7 +26,7 @@ class CustomGrouperAdminMixin:
             return qs
         accessor_name = grouper_fk_field.remote_field.get_accessor_name()
         manager = content_model._meta.managers_map.get("admin_manager", content_model._default_manager)
-        prefetch = Prefetch(accessor_name, queryset=manager.latest_content(), to_attr="_content_prefetch_cache")
+        prefetch = Prefetch(accessor_name, queryset=manager.latest_content(), to_attr="_admin_prefetch_cache")
 
         return qs.prefetch_related(prefetch)
 
