@@ -332,6 +332,15 @@ class _InverseRelationManager:
             for rel in self.relation_model.objects.filter(instance=self.instance).select_related("content_type")
         ]
 
+    def filter(self, *args, **kwargs):
+        return self.all().filter(*args, **kwargs)
+
+    def count(self):
+        return self.all().count()
+
+    def exists(self):
+        return self.all().exists()
+
 
 class InverseRelationDescriptor:
     """
@@ -445,6 +454,15 @@ class GenericM2MManager:
             ).values_list(self.related_field_name, flat=False)
         )
 
+    def filter(self, *args, **kwargs):
+        return self.all().filter(*args, **kwargs)
+
+    def count(self):
+        return self.all().count()
+
+    def exists(self):
+        return self.all().exists()
+
 
 class GenericM2MDescriptor:
     """
@@ -508,6 +526,15 @@ class DummyM2MManager:
     def clear(self):
         """No-op: does nothing."""
         pass
+
+    def filter(self, *args, **kwargs):
+        return self.all()
+
+    def count(self):
+        return self.all()
+
+    def exists(self):
+        return self.all()
 
 
 class DummyM2MDescriptor:
