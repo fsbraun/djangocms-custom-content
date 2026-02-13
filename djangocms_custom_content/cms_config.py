@@ -6,6 +6,7 @@ from cms.utils import get_current_site
 from cms.utils.i18n import get_language_tuple
 from django.apps import apps
 from django.contrib.admin import site as admin_site
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db import models
 from django.urls import path, reverse
 
@@ -120,6 +121,40 @@ class CustomContentConfig(CMSAppConfig):
                     ),
                 )
 
+    @staticmethod
+    def is_relation_for(model: type[models.Model]):
+        from djangocms_custom_content.models import AbstractCustomRelation
+
+        try:
+            if issubclass(model, AbstractCustomRelation):
+                print(model.__name__, model._meta.get_field("instance").related_model)
+                return model._meta.get_field("instance").related_model
+        except FieldDoesNotExist:
+            pass
+        return None
+
+    def register_m2m_relation(self, model: type[models.Model]):
+        from djangocms_custom_content.models import GenericM2MDescriptor
+
+        cms_config = getattr(model, "CMSConfig", None)
+        m2m_relations = getattr(cms_config, "m2m_relations", [])
+        if m2m_relations:
+            relation_model = next(
+                (_model for _model in apps.get_models() if self.is_relation_for(_model) is model), None
+            )
+            if not relation_model:
+                raise ImproperlyConfigured(
+                    f"Use {model.__name__}Relation = custom_relation_factory({model.__name__}) in your models.py to create a "
+                    "m2m relation model allowing for CMSConfig.m2m_relations"
+                )
+            for reverse_name, relation in m2m_relations:
+                try:
+                    related_model = apps.get_model(relation)
+                    related_model.add_to_class(reverse_name, GenericM2MDescriptor(relation_model, "instance"))
+                except LookupError:
+                    # Related model not installed, skip registration
+                    pass
+
     def register(self, model: type[models.Model]):
         from djangocms_custom_content.models import AbstractCustomGrouper
 
@@ -142,3 +177,4 @@ class CustomContentConfig(CMSAppConfig):
         self.register_frontend_editing(model, grouper_field_name)
         self.register_versioning(model, grouper_field_name, has_language_field)
         self.register_apphook(model, grouper_model.__name__)
+        self.register_m2m_relation(model)

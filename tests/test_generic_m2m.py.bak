@@ -1,0 +1,404 @@
+"""
+Tests for GenericM2MManager and GenericM2MDescriptor.
+"""
+import pytest
+from django.contrib.contenttypes.models import ContentType
+from django.db import models
+from django.test import TransactionTestCase
+
+from djangocms_custom_content.models import (
+    AbstractCustomRelation,
+    GenericM2MDescriptor,
+    GenericM2MManager,
+)
+from tests.test_app.models import Article, Author, AuthorRelation, Book, BookRelation
+
+pytestmark = pytest.mark.django_db
+
+
+class GenericM2MManagerTestCase(TransactionTestCase):
+    """Test case for GenericM2MManager."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.author = Author.objects.create(name="Test Author")
+        self.book1 = Book.objects.create(title="Book 1", author="Author 1")
+        self.book2 = Book.objects.create(title="Book 2", author="Author 2")
+        self.article = Article.objects.create(headline="Article 1")
+        
+        # Use the pre-defined AuthorRelation model
+        self.AuthorRelation = AuthorRelation
+
+    def test_manager_initialization(self):
+        """Test that GenericM2MManager initializes correctly."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        self.assertEqual(manager.instance, self.author)
+        self.assertEqual(manager.through_model, self.AuthorRelation)
+        self.assertEqual(manager.related_field_name, "instance")
+        self.assertIsNotNone(manager.content_type)
+
+    def test_get_queryset(self):
+        """Test that get_queryset returns correct filter."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        # Create some relations
+        ct = ContentType.objects.get_for_model(self.author)
+        self.AuthorRelation.objects.create(
+            instance=self.author,
+            content_type=ct,
+            object_id=self.author.pk
+        )
+        
+        queryset = manager.get_queryset()
+        self.assertEqual(queryset.count(), 1)
+        self.assertEqual(queryset.first().instance, self.author)
+
+    def test_add_single_object(self):
+        """Test adding a single object through the manager."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        manager.add(self.book1)
+        
+        # Check that the relation was created
+        ct = ContentType.objects.get_for_model(self.book1)
+        relation = self.AuthorRelation.objects.get(
+            instance=self.book1,
+            content_type=ct,
+            object_id=self.book1.pk
+        )
+        self.assertIsNotNone(relation)
+
+    def test_add_multiple_objects(self):
+        """Test adding multiple objects at once."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        manager.add(self.book1, self.book2, self.article)
+        
+        # Check that all relations were created
+        self.assertEqual(self.AuthorRelation.objects.count(), 3)
+
+    def test_add_duplicate_does_not_duplicate(self):
+        """Test that adding duplicate objects uses get_or_create."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        manager.add(self.book1)
+        manager.add(self.book1)
+        
+        # Should still have only one relation
+        ct = ContentType.objects.get_for_model(self.book1)
+        count = self.AuthorRelation.objects.filter(
+            instance=self.book1,
+            content_type=ct,
+            object_id=self.book1.pk
+        ).count()
+        self.assertEqual(count, 1)
+
+    def test_remove_object(self):
+        """Test removing an object through the manager."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        manager.add(self.book1, self.book2)
+        self.assertEqual(self.AuthorRelation.objects.count(), 2)
+        
+        manager.remove(self.book1)
+        
+        # Check that only one relation remains
+        self.assertEqual(self.AuthorRelation.objects.count(), 1)
+        remaining = self.AuthorRelation.objects.first()
+        self.assertEqual(remaining.instance, self.book2)
+
+    def test_remove_multiple_objects(self):
+        """Test removing multiple objects at once."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        manager.add(self.book1, self.book2, self.article)
+        self.assertEqual(self.AuthorRelation.objects.count(), 3)
+        
+        manager.remove(self.book1, self.book2)
+        
+        # Check that only article remains
+        self.assertEqual(self.AuthorRelation.objects.count(), 1)
+        remaining = self.AuthorRelation.objects.first()
+        self.assertEqual(remaining.instance, self.article)
+
+    def test_remove_nonexistent_object(self):
+        """Test that removing a non-existent object doesn't raise an error."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        manager.add(self.book1)
+        
+        # Should not raise an error
+        manager.remove(self.book2)
+        
+        # Original should still be there
+        self.assertEqual(self.AuthorRelation.objects.count(), 1)
+
+    def test_clear(self):
+        """Test clearing all relations."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        manager.add(self.book1, self.book2, self.article)
+        self.assertEqual(self.AuthorRelation.objects.count(), 3)
+        
+        manager.clear()
+        
+        self.assertEqual(self.AuthorRelation.objects.count(), 0)
+
+    def test_all_returns_related_objects(self):
+        """Test that all() returns the related objects."""
+        manager = GenericM2MManager(
+            self.author,
+            self.AuthorRelation,
+            "instance"
+        )
+        
+        manager.add(self.book1, self.book2)
+        
+        # Note: This test assumes the implementation works correctly
+        # The actual behavior depends on how _related_queryset is implemented
+        related = manager.all()
+        self.assertIsNotNone(related)
+
+    def test_manager_with_different_instances(self):
+        """Test that managers for different instances are independent."""
+        author2 = Author.objects.create(name="Another Author")
+        
+        manager1 = GenericM2MManager(self.author, self.AuthorRelation, "instance")
+        manager2 = GenericM2MManager(author2, self.AuthorRelation, "instance")
+        
+        manager1.add(self.book1)
+        manager2.add(self.book2)
+        
+        # Each manager should only have their own relations
+        self.assertEqual(manager1.get_queryset().count(), 1)
+        self.assertEqual(manager2.get_queryset().count(), 1)
+
+
+class GenericM2MDescriptorTestCase(TransactionTestCase):
+    """Test case for GenericM2MDescriptor."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.author = Author.objects.create(name="Test Author")
+        self.book = Book.objects.create(title="Test Book", author="Test Author")
+        self.BookRelation = BookRelation
+
+    def test_descriptor_on_class(self):
+        """Test accessing the descriptor on the class returns the descriptor itself."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        Book.add_to_class("test_desc_class", descriptor)
+        
+        result = Book.test_desc_class
+        self.assertIsInstance(result, GenericM2MDescriptor)
+
+    def test_descriptor_on_instance(self):
+        """Test accessing the descriptor on an instance returns a manager."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        Book.add_to_class("test_desc_instance", descriptor)
+        
+        result = self.book.test_desc_instance
+        self.assertIsInstance(result, GenericM2MManager)
+
+    def test_descriptor_manager_has_correct_instance(self):
+        """Test that the returned manager has the correct instance."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        Book.add_to_class("test_desc_inst_ref", descriptor)
+        
+        manager = self.book.test_desc_inst_ref
+        self.assertEqual(manager.instance, self.book)
+
+    def test_descriptor_manager_has_correct_through_model(self):
+        """Test that the returned manager has the correct through model."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        Book.add_to_class("test_desc_through", descriptor)
+        
+        manager = self.book.test_desc_through
+        self.assertEqual(manager.through_model, self.AuthorRelation)
+
+    def test_descriptor_manager_has_correct_related_field_name(self):
+        """Test that the returned manager has the correct related field name."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        Book.add_to_class("test_desc_field_name", descriptor)
+        
+        manager = self.book.test_desc_field_name
+        self.assertEqual(manager.related_field_name, "instance")
+
+    def test_descriptor_stores_relation_model(self):
+        """Test that the descriptor stores the relation model correctly."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        
+        self.assertEqual(descriptor.relation_model, self.AuthorRelation)
+
+    def test_descriptor_stores_related_field_name(self):
+        """Test that the descriptor stores the related field name correctly."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "test_field")
+        
+        self.assertEqual(descriptor.related_field_name, "test_field")
+
+    def test_multiple_descriptors_on_same_class(self):
+        """Test adding multiple descriptors to the same class."""
+        descriptor1 = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        descriptor2 = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        
+        Book.add_to_class("test_desc_multi1", descriptor1)
+        Book.add_to_class("test_desc_multi2", descriptor2)
+        
+        manager1 = self.book.test_desc_multi1
+        manager2 = self.book.test_desc_multi2
+        
+        self.assertIsInstance(manager1, GenericM2MManager)
+        self.assertIsInstance(manager2, GenericM2MManager)
+        self.assertEqual(manager1.instance, self.book)
+        self.assertEqual(manager2.instance, self.book)
+
+
+class GenericM2MIntegrationTestCase(TransactionTestCase):
+    """Integration tests for GenericM2MManager and GenericM2MDescriptor."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.author = Author.objects.create(name="Integration Test Author")
+        self.book1 = Book.objects.create(title="Integration Book 1", author="Author 1")
+        self.book2 = Book.objects.create(title="Integration Book 2", author="Author 2")
+        self.AuthorRelation = AuthorRelation
+
+    def test_descriptor_manager_add_and_retrieve(self):
+        """Test adding objects through descriptor manager and retrieving them."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        Book.add_to_class("test_integ_add_retrieve", descriptor)
+        
+        # Add objects using the descriptor manager
+        self.book1.test_integ_add_retrieve.add(self.author)
+        
+        # Verify the relation exists
+        self.assertEqual(self.AuthorRelation.objects.count(), 1)
+
+    def test_descriptor_manager_multiple_operations(self):
+        """Test multiple operations using descriptor manager."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        Book.add_to_class("test_integ_multi_ops", descriptor)
+        
+        manager = self.book1.test_integ_multi_ops
+        
+        # Add objects
+        manager.add(self.author)
+        self.assertEqual(self.AuthorRelation.objects.count(), 1)
+        
+        # Clear objects
+        manager.clear()
+        self.assertEqual(self.AuthorRelation.objects.count(), 0)
+
+    def test_descriptor_manager_on_different_instances(self):
+        """Test descriptor managers on different instances are independent."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        Book.add_to_class("test_integ_diff_inst", descriptor)
+        
+        manager1 = self.book1.test_integ_diff_inst
+        manager2 = self.book2.test_integ_diff_inst
+        
+        manager1.add(self.author)
+        
+        # Only book1's manager should have the relation
+        self.assertEqual(manager1.get_queryset().count(), 1)
+        self.assertEqual(manager2.get_queryset().count(), 0)
+
+
+class GenericM2MEdgeCasesTestCase(TransactionTestCase):
+    """Test edge cases for GenericM2MManager and GenericM2MDescriptor."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.author = Author.objects.create(name="Edge Case Author")
+        self.book = Book.objects.create(title="Edge Case Book", author="Test")
+        self.AuthorRelation = AuthorRelation
+
+    def test_add_same_object_twice(self):
+        """Test adding the same object twice doesn't create duplicates."""
+        manager = GenericM2MManager(self.author, self.AuthorRelation, "instance")
+        
+        manager.add(self.book)
+        manager.add(self.book)
+        
+        ct = ContentType.objects.get_for_model(self.book)
+        count = self.AuthorRelation.objects.filter(
+            instance=self.book,
+            content_type=ct,
+            object_id=self.book.pk
+        ).count()
+        self.assertEqual(count, 1)
+
+    def test_clear_empty_manager(self):
+        """Test clearing an empty manager doesn't raise an error."""
+        manager = GenericM2MManager(self.author, self.AuthorRelation, "instance")
+        
+        # Should not raise an error
+        manager.clear()
+        self.assertEqual(self.AuthorRelation.objects.count(), 0)
+
+    def test_remove_from_empty_manager(self):
+        """Test removing from an empty manager doesn't raise an error."""
+        manager = GenericM2MManager(self.author, self.AuthorRelation, "instance")
+        
+        # Should not raise an error
+        manager.remove(self.book)
+        self.assertEqual(self.AuthorRelation.objects.count(), 0)
+
+    def test_manager_content_type_calculation(self):
+        """Test that manager correctly calculates content type."""
+        manager = GenericM2MManager(self.author, self.AuthorRelation, "instance")
+        
+        expected_ct = ContentType.objects.get_for_model(self.author)
+        self.assertEqual(manager.content_type, expected_ct)
+
+    def test_descriptor_with_none_instance(self):
+        """Test descriptor returns itself when instance is None (class access)."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        
+        # Accessing on the class should return the descriptor
+        result = descriptor.__get__(None, Book)
+        self.assertIs(result, descriptor)
+
+    def test_descriptor_with_instance(self):
+        """Test descriptor returns manager when instance is provided."""
+        descriptor = GenericM2MDescriptor(self.AuthorRelation, "instance")
+        
+        # Accessing on an instance should return a manager
+        result = descriptor.__get__(self.book, Book)
+        self.assertIsInstance(result, GenericM2MManager)

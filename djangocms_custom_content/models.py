@@ -172,47 +172,55 @@ class InverseRelationDescriptor:
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        print(owner)
         return _InverseRelationManager(instance, self.relation_model)
 
 
-class _GenericRelationManager:
-    def __init__(self, instance, relation_model, owner):
+class GenericM2MManager:
+    def __init__(self, instance: models.Model, through_model: type[AbstractCustomRelation], related_field_name: str):
         self.instance = instance
-        self.relation_model = relation_model
-        self.owner = owner
+        self.through_model = through_model
+        self.related_field_name = related_field_name
+        self.content_type = ContentType.objects.get_for_model(instance)
 
-    def add(self, obj):
-        ct = ContentType.objects.get_for_model(self.owner)
-        self.relation_model.objects.get_or_create(
-            instance=self.instance,
-            content_type=ct,
-            object_id=self.owner.pk,
-        )
-
-    def remove(self, obj):
-        ct = ContentType.objects.get_for_model(self.owner)
-        self.relation_model.objects.filter(
-            instance=self.instance,
-            content_type=ct,
-            object_id=self.owner.pk,
-        ).delete()
+    def get_queryset(self):
+        return self.through_model.objects.filter(content_type=self.content_type, object_id=self.instance.pk)
 
     def all(self):
-        return [
-            rel.instance
-            for rel in self.relation_model.objects.filter(content_object=self.instance).select_related("instance")
-        ]
+        return self._related_queryset()
+
+    def add(self, *objs):
+        for obj in objs:
+            self.through_model.objects.get_or_create(
+                **{
+                    self.related_field_name: obj,
+                    "content_type": self.content_type,
+                    "object_id": self.instance.pk,
+                }
+            )
+
+    def remove(self, *objs):
+        self.get_queryset().filter(**{f"{self.related_field_name}__in": objs}).delete()
+
+    def clear(self):
+        self.get_queryset().delete()
+
+    def _related_queryset(self):
+        return self.through_model._meta.get_field("instance").related_model.admin_manager.filter(
+            pk__in=self.through_model.objects.filter(
+                content_type=self.content_type, object_id=self.instance.pk
+            ).values_list(self.related_field_name, flat=False)
+        )
 
 
-class GenericRelationDescriptor:
-    def __init__(self, relation_model: type[models.Model]):
+class GenericM2MDescriptor:
+    def __init__(self, relation_model: type[models.Model], related_field_name: str):
         self.relation_model = relation_model
+        self.related_field_name = related_field_name
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        return _GenericRelationManager(instance, self.relation_model, owner)
+        return GenericM2MManager(instance, self.relation_model, self.related_field_name)
 
 
 def custom_relation_factory(model: type[models.Model], related_name: str | None = None) -> type[models.Model]:
