@@ -1,5 +1,5 @@
-How-To: Set Up Many-to-Many Relations (m2m_relations)
-====================================================
+Set Up Many-to-Many Relations (m2m_relations)
+=============================================
 
 M2M relations connect your content objects to other Django models using ``custom_relation_factory()`` and ``CMSConfig.m2m_relations``.
 

@@ -1,5 +1,5 @@
-Conceptual Documentation
-========================
+Explanations
+============
 
 Deep dives into how djangocms-custom-content works and why.
 

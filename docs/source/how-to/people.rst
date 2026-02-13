@@ -1,5 +1,5 @@
-People Module (Authors)
-=======================
+Using the contrib.people module
+===============================
 
 Manage people/authors and link them to content via M2M relations.
 

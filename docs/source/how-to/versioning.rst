@@ -1,5 +1,5 @@
-How-To: Implement Content Versioning
-====================================
+Implement Content Versioning
+============================
 
 djangocms-custom-content uses language codes to manage multiple versions of content.
 

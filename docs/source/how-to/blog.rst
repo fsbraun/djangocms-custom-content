@@ -1,5 +1,5 @@
-Blog Module
-===========
+Using the contrib.blog module
+=============================
 
 Complete blog system with posts, featured posts, and versioning.
 
@@ -44,7 +44,7 @@ Usage
 
     # Access by language
     english_version = post.get_content(language="en")
-    
+
     # Get featured posts
     featured = BlogPostContent.objects.filter(is_featured=True)
 

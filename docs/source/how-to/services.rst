@@ -1,5 +1,5 @@
-Services Module
-===============
+Using the contrib.services module
+=================================
 
 Service/product showcase with descriptions and features.
 

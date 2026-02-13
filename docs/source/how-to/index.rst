@@ -8,6 +8,10 @@ Step-by-step instructions for common tasks.
 
    m2m_relations
    versioning
+   blog
+   categories
+   people
+   services
 
 Each guide focuses on solving a specific problem or implementing a particular feature.
 

@@ -11,10 +11,10 @@ Description
 and integrate your own custom content models with django CMS.
 
 It helps you define model-based content types and ship the common CMS integration
-pieces (admin, plugins, rendering) with minimal boilerplate. Depending on your
-project needs, it can optionally add:
+pieces with minimal boilerplate. Depending on your project needs, it can optionally add:
 
 * apphooks for dedicated content sections/URLs
+* frontend editable placeholders
 * versioning support
 * relationships to other content types or existing domain models
 

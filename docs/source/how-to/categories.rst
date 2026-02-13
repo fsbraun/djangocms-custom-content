@@ -1,5 +1,5 @@
-Categories Module
-==================
+Using the contrib.categories module
+===================================
 
 Flexible category system for organizing content.
 

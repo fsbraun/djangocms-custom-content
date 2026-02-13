@@ -6,8 +6,8 @@ djangocms-custom-content
 Developer framework for integrating custom content models with django CMS.
 
 ``djangocms-custom-content`` provides a fast, flexible way to build custom content types
-and integrate them with django CMS. It handles the common integration pieces (admin,
-plugins, rendering) so you can focus on your content models.
+and integrate them with django CMS. It handles the common integration pieces (versioning,
+frontend-editing, relationships) so you can focus on your content models, and their admin handling.
 
 ----
 
@@ -57,29 +57,6 @@ plugins, rendering) so you can focus on your content models.
 * **Clean architecture** — Simple grouper/content pattern avoiding boilerplate
 * **Django CMS 5.0+** — Compatible with modern django CMS and Django versions
 
-----
-
-📚 Additional Resources
------------------------
-
-.. grid:: 2
-   :gutter: 2
-
-   .. grid-item-card:: 💡 Creating Custom Models
-      :link: creating_custom_models
-      :link-type: doc
-
-      In-depth guide to building your own custom content models
-      from scratch.
-
-   .. grid-item-card:: 📦 Example Modules
-      :link: contrib_examples
-      :link-type: doc
-
-      Pre-built examples: blog, people, services, and categories
-      ready to use or adapt.
-
-----
 
 Contents
 --------
@@ -92,9 +69,6 @@ Contents
    how-to/index
    explanation/index
    reference/index
-   contrib/index
-   creating_custom_models
-   contrib_examples
 
 Indices and tables
 ==================
