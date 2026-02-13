@@ -231,5 +231,5 @@ def custom_relation_factory(model: type[models.Model], related_name: str | None 
     if related_name is None:
         related_name = "relation_set"
 
-    model.add_to_class(related_name, InverseRelationDescriptor(relation_model))
-    return relation_model
+    model.add_to_class(related_name, InverseRelationDescriptor(relation_model))  # type: ignore
+    return relation_model  # type: ignore
