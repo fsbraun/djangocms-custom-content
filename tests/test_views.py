@@ -1,4 +1,5 @@
 import pytest
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import RequestFactory, TestCase
@@ -12,6 +13,8 @@ from djangocms_custom_content.views import (
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
+
+VERSIONING = apps.is_installed("djangocms_versioning")
 
 
 class _ToolbarStub:
@@ -37,6 +40,15 @@ class ViewsTestCase(TestCase):
             slug="jane-doe",
         )
 
+        # Publish content for versioning compatibility
+        if VERSIONING:
+            from djangocms_versioning.constants import DRAFT
+            from djangocms_versioning.models import Version
+
+            version = Version.objects.filter_by_grouper(self.person).filter(state=DRAFT).first()
+            if version:
+                version.publish(self.superuser)
+
     def test_custom_detail_view_factory_sets_model(self):
         view_class = custom_detail_view_factory(PersonContent)
 
@@ -55,13 +67,16 @@ class ViewsTestCase(TestCase):
             self.assertTrue(select_related)
 
     def test_frontend_editable_mixin_sets_toolbar_object(self):
+        # For frontend editor, use draft content (no publish needed)
         view_class = custom_detail_view_factory(PersonContent)
         view = view_class()
         request = self.factory.get("/")
         request.toolbar = _ToolbarStub()
 
-        # Properly initialize the view before calling methods
+        # Use admin_manager to access all content including drafts
         view.setup(request, pk=self.person_content.pk)
+        if VERSIONING:
+            view.queryset = PersonContent.admin_manager.all()
 
         obj = view.get_object()
 
