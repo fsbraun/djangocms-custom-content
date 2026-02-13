@@ -186,18 +186,19 @@ class AbstractCustomContent(CustomContentMixin, models.Model):
     to your custom content types.
 
     To define generic many-to-many relationships with other models, create a
-    CMSConfig class with the ``m2m_relations`` attribute:
+    CMSConfig class with the ``invite_m2m_relations`` attribute:
 
         class MyContentModel(AbstractCustomContent):
             # ... fields ...
 
             class CMSConfig:
-                m2m_relations = [("related_set", "app_label.RelatedModel")]
+                invite_m2m_relations = [("related_set", "app_label.RelatedModel")]
+                relate_to = [()"my_set", "cms.Page")]
 
         # Create the relation model (required):
         MyContentRelation = custom_relation_factory(MyContentModel)
 
-    See the documentation for more details on m2m_relations.
+    See the documentation for more details on M2M relations (relate_to and invite_m2m_relations).
     """
 
     objects = CustomContentManager()
@@ -376,11 +377,11 @@ class GenericM2MManager:
 
     Example::
 
-        # After defining m2m_relations in CMSConfig:
-        blog_post = BlogPost.objects.first()
-        authors = blog_post.author_set.all()  # Returns all related PersonContent objects
-        blog_post.author_set.add(person_content)  # Add a relation
-        blog_post.author_set.remove(person_content)  # Remove a relation
+        # After defining invite_m2m_relations in CMSConfig:
+        blog_post_content = BlogPostContent.objects.first()
+        authors = blog_post_content.authors.all()  # Returns all related Person objects
+        blog_post_content.authors.add(person)  # Add a relation
+        blog_post_content.authors.remove(person)  # Remove a relation
     """
 
     def __init__(self, instance: models.Model, through_model: type[AbstractCustomRelation], related_field_name: str):
@@ -449,7 +450,7 @@ class GenericM2MDescriptor:
     """
     Descriptor that provides a GenericM2MManager for generic M2M relationships.
 
-    This descriptor is automatically assigned to models via m2m_relations
+    This descriptor is automatically assigned to models via relate_to or invite_m2m_relations
     in CMSConfig and provides the manager interface for accessing relationships.
 
     The descriptor returns itself when accessed on the class, and returns a
@@ -513,7 +514,7 @@ class DummyM2MDescriptor:
     """
     Descriptor providing a dummy interface for unavailable generic M2M relations.
 
-    This descriptor is used when a related model specified in m2m_relations
+    This descriptor is used when a related model specified in relate_to or invite_m2m_relations
     cannot be found or is not yet available. It provides a safe interface that
     returns empty results instead of raising errors.
 
@@ -537,16 +538,16 @@ class DummyM2MDescriptor:
 
 def custom_relation_factory(model: type[models.Model], related_name: str | None = None) -> type[models.Model]:
     """
-    Factory function to create a relation model for use with m2m_relations.
+    Factory function to create a relation model for use with relate_to or invite_m2m_relations.
 
     This function creates a concrete relation model that inherits from
     AbstractCustomRelation and is linked to the provided model. The relation model
-    is required when using m2m_relations in a model's CMSConfig.
+    is required when using relate_to or invite_m2m_relations in a model's CMSConfig.
 
-    :param model: The content model to create a relation model for.
+    :param model: The model to create a relation model for.
     :param related_name: Optional. The name of the reverse accessor on the model.
         Defaults to ``relation_set``.
-    :returns: A new relation model class that can be used with ``m2m_relations``.
+    :returns: A new relation model class that can be used with ``relate_to`` or ``invite_m2m_relations``.
 
     Example:
 
@@ -558,10 +559,11 @@ def custom_relation_factory(model: type[models.Model], related_name: str | None 
             # ... fields ...
 
             class CMSConfig:
-                m2m_relations = [("author_set", "blog.BlogPost")]
+                invite_m2m_relations = [("authors", "blog.BlogPost")]
 
-                # Create the relation model (required for m2m_relations)
-                PersonRelation = custom_relation_factory(PersonContent)
+        # Create the relation model (required for invite_m2m_relations)
+        # Note: Create for the Grouper (Person), not the Content model
+        PersonRelation = custom_relation_factory(Person)
 
     Notes:
             - This must be called at the module level to ensure proper registration.

@@ -8,7 +8,7 @@ This tutorial builds on the :doc:`blog_example` tutorial.
 Overview
 --------
 
-We'll add authors to our blog posts using the ``m2m_relations`` feature:
+We'll add authors to our blog posts using the ``invite_m2m_relations`` feature:
 
 - Create a ``Person`` model to represent authors
 - Link ``Person`` objects to blog posts using generic M2M relations
@@ -34,7 +34,7 @@ Add to ``my_blog/models.py``:
             verbose_name_plural = "Authors"
 
         def __str__(self):
-            return self.name
+            return self.get_admin_content().name if self.get_admin_content() else "Unknown"
 
     class PersonContent(AbstractCustomContent):
         """Author profile information."""
@@ -45,14 +45,16 @@ Add to ``my_blog/models.py``:
         email = models.EmailField(blank=True)
 
         class CMSConfig:
-            # Add 'author_set' accessor to BlogPost
-            m2m_relations = [("author_set", "my_blog.BlogPost")]
+            enable_versioning = True
+            # Add 'authors' accessor to BlogPostContent
+            invite_m2m_relations = [("authors", "my_blog.Person")]
 
         def __str__(self):
             return self.full_name
 
-    # THIS IS REQUIRED for m2m_relations to work
-    PersonRelation = custom_relation_factory(PersonContent)
+    # THIS IS REQUIRED for invite_m2m_relations to work
+    # Note: Create relation factory for the Grouper (Person), not Content model
+    PersonRelation = custom_relation_factory(Person)
 
 Step 2: Register with Admin
 ----------------------------
@@ -83,17 +85,20 @@ Add to ``my_blog/views.py``:
 
     def blog_post_detail(request, slug):
         """Display a blog post with its authors."""
-        blog_post = get_object_or_404(BlogPost, slug=slug)
-        content = blog_post.get_content(request.LANGUAGE_CODE)
+        blog_post_content = get_object_or_404(
+            BlogPostContent,
+            slug=slug,
+            language=request.LANGUAGE_CODE
+        )
 
         # Get all authors linked to this post
-        authors = blog_post.author_set.all()
+        authors = blog_post_content.authors.all()
 
         return render(
             request,
             "my_blog/post_detail.html",
             {
-                "post": content,
+                "post": blog_post_content,
                 "authors": authors,
             }
         )
@@ -152,27 +157,31 @@ Via Django shell:
 
 .. code-block:: python
 
-    from my_blog.models import BlogPost, PersonContent
+    from my_blog.models import BlogPostContent, Person
 
-    blog_post = BlogPost.objects.first()
-    author = PersonContent.objects.first()
+    blog_post_content = BlogPostContent.objects.first()
+    person = Person.objects.first()
 
     # Add an author to the post
-    blog_post.author_set.add(author)
+    blog_post_content.authors.add(person)
 
     # Get all authors of a post
-    all_authors = blog_post.author_set.all()
+    all_authors = blog_post_content.authors.all()
 
     # Remove an author
-    blog_post.author_set.remove(author)
+    blog_post_content.authors.remove(person)
 
     # Clear all authors
-    blog_post.author_set.clear()
+    blog_post_content.authors.clear()
 
-Or via Django admin by using the ``PersonContent`` model and adding relationships through the relation model.
+Via Django admin:
+
+1. Edit a ``BlogPostContent`` object
+2. Use the ``authors`` accessor to add/remove Person objects
+3. Save
 
 Next Steps:
 
-- Learn more about :doc:`../how-to/m2m_relations`
-- Explore :doc:`../explanation/architecture` to understand how M2M relations work
+- Learn more about :doc:`../how-to/m2m_relations` and both ``relate_to`` and ``invite_m2m_relations``
+- Explore :doc:`../explanation/relationships` to understand how M2M relations work
 - Check :doc:`../reference/index` for complete API reference
