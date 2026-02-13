@@ -27,8 +27,7 @@ jobs:
             ${{ runner.os }}-pip-
       - name: Install dependencies
         run: |
-          cd docs
-          python -m pip install -r ./requirements.txt
+          python -m pip install -r docs/requirements.txt
       - name: Build docs
         run: |
           cd docs
@@ -55,8 +54,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
       - run: |
-          cd docs
-          python -m pip install -r ./requirements.txt
+          python -m pip install -r docs/requirements.txt
       - name: Check spelling
         run: |
           cd docs

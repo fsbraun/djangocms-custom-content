@@ -5,4 +5,4 @@ sphinx-copybutton
 sphinx-design
 sphinxcontrib-spelling
 pip-tools
--e ..
+-e .
