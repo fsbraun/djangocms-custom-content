@@ -15,7 +15,6 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 
-@toolbar_pool.register
 class CustomContentToolbar(CMSToolbar):
     """
     Toolbar for djangocms-custom-content.
@@ -30,8 +29,15 @@ class CustomContentToolbar(CMSToolbar):
     def get_insert_position(cls, admin_menu, item_name):
         """
         Ensures that there is a SHORTCUTS_BREAK and returns a position for an
-        alphabetical position against all items between SHORTCUTS_BREAK, and
+        alphabetical position against all custom content items between SHORTCUTS_BREAK, and
         the ADMINISTRATION_BREAK.
+
+        Args:
+            ``admin_menu``: The CMS admin menu instance to inspect and modify.
+            ``item_name``: The menu item name used for alphabetical ordering.
+
+        Returns:
+            The integer position where the item should be inserted.
         """
         start = admin_menu.find_first(Break, identifier=SHORTCUTS_BREAK)
 
@@ -64,6 +70,7 @@ class CustomContentToolbar(CMSToolbar):
         return end.index
 
     def add_shortcut_links(self):
+        """Add shortcut links for each configured grouper model."""
         admin_menu = self.toolbar.get_or_create_menu(ADMIN_MENU_IDENTIFIER)
 
         for grouper, _field_name, _has_lang in self.config.custom_content_groupers.values():
@@ -77,7 +84,7 @@ class CustomContentToolbar(CMSToolbar):
                 )
 
     def add_content_object_menu(self):
-        """Add menu for the grouper model."""
+        """Add menu entries for the current grouper instance."""
         # Get verbose name from the grouper model
         menu_name = self.grouper._meta.verbose_name.title()
         plural = self.grouper._meta.verbose_name_plural.title()
@@ -111,7 +118,7 @@ class CustomContentToolbar(CMSToolbar):
         menu.add_sideframe_item(_("Show all %s") % plural, url=changelist_url, disabled=not (can_view or can_change))
 
     def populate(self):
-        """Add custom content settings button to toolbar."""
+        """Populate the toolbar with custom content entries."""
 
         content = self.toolbar.get_object()
         self.config = apps.get_app_config("djangocms_custom_content").cms_config
@@ -137,3 +144,6 @@ class CustomContentToolbar(CMSToolbar):
                 url=url,
                 side=self.toolbar.RIGHT,
             )
+
+
+toolbar_pool.register(CustomContentToolbar)

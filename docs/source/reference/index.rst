@@ -25,34 +25,21 @@ Models
 .. autoclass:: djangocms_custom_content.models.GenericM2MManager
    :members:
 
-Configuration
--------------
-
-.. autoclass:: djangocms_custom_content.cms_config.CMSConfig
-   :members:
-
-CMS Plugins
------------
-
-.. autoclass:: djangocms_custom_content.cms_plugins.CustomCMSPluginBase
-   :members:
-   :show-inheritance:
-
 CMS Toolbars
 ------------
 
-.. autoclass:: djangocms_custom_content.cms_toolbars.CustomToolbar
+.. autoclass:: djangocms_custom_content.cms_toolbars.CustomContentToolbar
    :members:
    :show-inheritance:
 
 Admin
 -----
 
-.. autoclass:: djangocms_custom_content.admin.CustomContentAdmin
+.. autoclass:: djangocms_custom_content.admin.CustomGrouperAdminMixin
    :members:
    :show-inheritance:
 
-.. autoclass:: djangocms_custom_content.admin.CustomGrouperAdmin
+.. autoclass:: djangocms_custom_content.admin.CustomContentAdminMixin
    :members:
    :show-inheritance:
 

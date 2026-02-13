@@ -85,8 +85,8 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
         Implements caching logic for efficient content retrieval.
 
         Args:
-            language: The language code to retrieve content for
-            qs: The queryset to retrieve from
+            ``language``: The language code to retrieve content for
+            ``qs``: The queryset to retrieve from
 
         Returns:
             The content model instance or None if not found
@@ -112,7 +112,7 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
         Implements caching for performance.
 
         Args:
-            language: The language code to retrieve. Defaults to current language.
+            ``language``: The language code to retrieve. Defaults to current language.
 
         Returns:
             The content model instance for the specified language, or None if not found
@@ -136,7 +136,7 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
         when available. It retrieves the latest published content.
 
         Args:
-            language: The language code to retrieve. Defaults to current language.
+            ``language``: The language code to retrieve. Defaults to current language.
 
         Returns:
             The latest content model instance for the specified language, or None if not found
@@ -286,8 +286,8 @@ class _InverseRelationManager:
     descriptors.
 
     Args:
-        instance: The model instance this manager is bound to
-        relation_model: The relation model (inherits from :class:`AbstractCustomRelation`)
+        ``instance``: The model instance this manager is bound to
+        ``relation_model``: The relation model (inherits from :class:`AbstractCustomRelation`)
     """
 
     def __init__(self, instance, relation_model):
@@ -298,7 +298,7 @@ class _InverseRelationManager:
         """Add a related object to this instance's relations.
 
         Args:
-            obj: The object to relate to this instance
+            ``obj``: The object to relate to this instance
         """
         ct = ContentType.objects.get_for_model(obj)
         self.relation_model.objects.get_or_create(
@@ -311,7 +311,7 @@ class _InverseRelationManager:
         """Remove a related object from this instance's relations.
 
         Args:
-            obj: The object to remove from this instance's relations
+            ``obj``: The object to remove from this instance's relations
         """
         ct = ContentType.objects.get_for_model(obj)
         self.relation_model.objects.filter(
@@ -343,7 +343,7 @@ class InverseRelationDescriptor:
     :class:`_InverseRelationManager` instance when accessed on a model instance.
 
     Args:
-        relation_model: The relation model (inherits from :class:`AbstractCustomRelation`)
+        ``relation_model``: The relation model (inherits from :class:`AbstractCustomRelation`)
 
     Example::
 
@@ -374,7 +374,8 @@ class GenericM2MManager:
         Instance managers are created automatically via GenericM2MDescriptor and
         should not be instantiated directly.
 
-    Example:
+    Example::
+
         # After defining m2m_relations in CMSConfig:
         blog_post = BlogPost.objects.first()
         authors = blog_post.author_set.all()  # Returns all related PersonContent objects
@@ -386,9 +387,9 @@ class GenericM2MManager:
         """Initialize the manager.
 
         Args:
-            instance: The model instance this manager is bound to
-            through_model: The relation model (inherits from AbstractCustomRelation)
-            related_field_name: The field name on the through_model pointing to related objects
+            ``instance``: The model instance this manager is bound to
+            ``through_model``: The relation model (inherits from AbstractCustomRelation)
+            ``related_field_name``: The field name on the through_model pointing to related objects
         """
         self.instance = instance
         self.through_model = through_model
@@ -409,7 +410,7 @@ class GenericM2MManager:
         Uses get_or_create to prevent duplicates.
 
         Args:
-            *objs: One or more model instances to add
+            ``*objs``: One or more model instances to add
         """
         for obj in objs:
             self.through_model.objects.get_or_create(
@@ -424,7 +425,7 @@ class GenericM2MManager:
         """Remove one or more objects from the relation.
 
         Args:
-            *objs: One or more model instances to remove
+            ``*objs``: One or more model instances to remove
         """
         self.get_queryset().filter(**{f"{self.related_field_name}__in": objs}).delete()
 
@@ -456,8 +457,8 @@ class GenericM2MDescriptor:
         """Initialize the descriptor.
 
         Args:
-            relation_model: The relation model (inherits from AbstractCustomRelation)
-            related_field_name: The field name on the relation model pointing to related objects
+            ``relation_model``: The relation model (inherits from AbstractCustomRelation)
+            ``related_field_name``: The field name on the relation model pointing to related objects
         """
         self.relation_model = relation_model
         self.related_field_name = related_field_name
@@ -476,15 +477,14 @@ def custom_relation_factory(model: type[models.Model], related_name: str | None 
     AbstractCustomRelation and is linked to the provided model. The relation model
     is required when using m2m_relations in a model's CMSConfig.
 
-    Args:
-        model: The content model to create a relation model for
-        related_name: Optional. The name of the reverse accessor on the model.
-                      Defaults to 'relation_set'.
+    :param model: The content model to create a relation model for.
+    :param related_name: Optional. The name of the reverse accessor on the model.
+        Defaults to ``relation_set``.
+    :returns: A new relation model class that can be used with ``m2m_relations``.
 
-    Returns:
-        A new relation model class that can be used with m2m_relations.
+    Example:
 
-    Example::
+    .. code-block:: python
 
         from djangocms_custom_content.models import AbstractCustomContent, custom_relation_factory
 
@@ -494,14 +494,14 @@ def custom_relation_factory(model: type[models.Model], related_name: str | None 
             class CMSConfig:
                 m2m_relations = [("author_set", "blog.BlogPost")]
 
-        # Create the relation model (required for m2m_relations)
-        PersonRelation = custom_relation_factory(PersonContent)
+                # Create the relation model (required for m2m_relations)
+                PersonRelation = custom_relation_factory(PersonContent)
 
     Notes:
-        - This must be called at the module level to ensure proper registration
-        - The returned model class will have an 'instance' ForeignKey to the provided model
-        - It will also have the standard AbstractCustomRelation fields:
-          content_type, object_id, and the GenericForeignKey 'content_object'
+            - This must be called at the module level to ensure proper registration.
+            - The returned model class will have an ``instance`` ForeignKey to the provided model.
+            - It will also have the standard AbstractCustomRelation fields:
+              ``content_type``, ``object_id``, and the GenericForeignKey ``content_object``.
     """
     relation_model = ModelBase(
         f"{model.__name__}Relation",

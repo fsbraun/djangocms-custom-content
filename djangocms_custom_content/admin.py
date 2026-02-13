@@ -7,8 +7,21 @@ from django.urls import path
 
 
 class CustomGrouperAdminMixin:
+    """Admin mixin to optimize queries and redirect content endpoints.
+
+    This mixin prefetches related content for admin lists and provides a
+    breadcrumb redirect compatible with django CMS versioning.
+    """
+
     def get_queryset(self, request: HttpRequest):
-        """Override the default queryset to only show groupers that have content."""
+        """Return a queryset prefetched with latest related content.
+
+        Args:
+            ``request``: The current admin request.
+
+        Returns:
+            The queryset, optionally prefetched with admin manager content.
+        """
         qs = super().get_queryset(request)
         content_model = getattr(self, "content_model", None)
         if content_model is None:
@@ -31,6 +44,7 @@ class CustomGrouperAdminMixin:
         return qs.prefetch_related(prefetch)
 
     def get_urls(self):
+        """Register breadcrumb redirect URLs for grouper admin views."""
         urls = super().get_urls()
 
         info = f"{self.content_model._meta.app_label}_{self.content_model._meta.model_name}"
@@ -40,9 +54,11 @@ class CustomGrouperAdminMixin:
         ] + urls
 
     def breadcrumb_redir(self, request, *args, **kwargs):
-        """djangocms-versioning uses content admin urls for breadcrumbs, but
-        we use grouper admin classes and want to redirect to the grouper
-        admin urls instead."""
+        """Redirect versioning breadcrumb URLs to the grouper admin.
+
+        djangocms-versioning uses content admin URLs for breadcrumbs, but this
+        project uses grouper admin classes and must redirect accordingly.
+        """
         id = kwargs.get("slug")
         info = f"{self.model._meta.app_label}_{self.model._meta.model_name}"
         if id:

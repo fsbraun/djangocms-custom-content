@@ -38,7 +38,6 @@ extensions = [
 autodoc_default_options = {
     "members": True,
     "member-order": "bysource",
-    "special-members": "__init__",
     "undoc-members": True,
     "show-inheritance": True,
 }
@@ -74,8 +73,8 @@ autodoc_mock_imports = [
 
 
 def autodoc_skip_member(app, what, name, obj, skip, options):
-    """Skip Meta classes from autodoc."""
-    if name == "Meta":
+    """Skip Meta and Media classes from autodoc."""
+    if name in {"Meta", "Media"}:
         return True
     return skip
 
