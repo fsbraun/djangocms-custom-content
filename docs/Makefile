@@ -56,7 +56,7 @@ help:
 
 install:
 	@echo "... setting up docs virtualenv"
-	python3 -m venv env
+	python3 -m venv env || python -m venv env
 	. $(VENV); pip install -r requirements.txt
 	@echo "\n" \
 	      "-------------------------------------------------------------------------------------------------- \n" \
