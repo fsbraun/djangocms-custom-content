@@ -59,8 +59,9 @@ class ViewsTestCase(TestCase):
         view = view_class()
         request = self.factory.get("/")
         request.toolbar = _ToolbarStub()
-        view.request = request
-        view.kwargs = {"pk": self.person_content.pk}
+
+        # Properly initialize the view before calling methods
+        view.setup(request, pk=self.person_content.pk)
 
         obj = view.get_object()
 
@@ -82,8 +83,8 @@ class ViewsTestCase(TestCase):
 
         view_class = type("PlainDetailView", (DetailView,), {"model": PersonContent})
         view = view_class()
-        view.request = self.factory.get("/")
-        view.kwargs = {"pk": self.person_content.pk}
+        request = self.factory.get("/")
+        view.setup(request, pk=self.person_content.pk)
 
         with CaptureQueriesContext(connection) as ctx:
             obj = view.get_object()
@@ -97,8 +98,8 @@ class ViewsTestCase(TestCase):
         """Test query count for detail view with CustomDetailViewMixin."""
         view_class = custom_detail_view_factory(PersonContent)
         view = view_class()
-        view.request = self.factory.get("/")
-        view.kwargs = {"pk": self.person_content.pk}
+        request = self.factory.get("/")
+        view.setup(request, pk=self.person_content.pk)
 
         with CaptureQueriesContext(connection) as ctx:
             obj = view.get_object()
