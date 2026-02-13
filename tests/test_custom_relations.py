@@ -1,6 +1,4 @@
-"""
-Tests for custom_relation_factory and GenericRelationDescriptor.
-"""
+"""Tests for custom_relation_factory and GenericM2MDescriptor."""
 
 import pytest
 from django.contrib.contenttypes.models import ContentType
@@ -9,7 +7,8 @@ from django.test import TestCase
 
 from djangocms_custom_content.models import (
     AbstractCustomRelation,
-    GenericRelationDescriptor,
+    GenericM2MDescriptor,
+    GenericM2MManager,
     InverseRelationDescriptor,
     custom_relation_factory,
 )
@@ -125,51 +124,40 @@ class InverseRelationDescriptorTestCase(TestCase):
         self.assertEqual(descriptor.relation_model, AuthorRelation)
 
 
-class GenericRelationDescriptorTestCase(TestCase):
-    """Test case for GenericRelationDescriptor."""
+class GenericM2MDescriptorTestCase(TestCase):
+    """Test case for GenericM2MDescriptor."""
 
     def test_descriptor_on_class(self):
         """Test accessing the descriptor on the class returns the descriptor."""
         AuthorRelation = custom_relation_factory(Author, related_name="test_items")
-        Book.add_to_class("test_authors", GenericRelationDescriptor(AuthorRelation))
+        Book.add_to_class("test_authors", GenericM2MDescriptor(AuthorRelation, "instance"))
 
         descriptor = Book.test_authors
-        self.assertIsInstance(descriptor, GenericRelationDescriptor)
+        self.assertIsInstance(descriptor, GenericM2MDescriptor)
 
     def test_descriptor_on_instance(self):
         """Test accessing the descriptor on an instance returns a manager."""
-        from djangocms_custom_content.models import _GenericRelationManager
-
         AuthorRelation = custom_relation_factory(Author, related_name="test_gen_items")
-        Book.add_to_class("test_gen_authors", GenericRelationDescriptor(AuthorRelation))
+        Book.add_to_class("test_gen_authors", GenericM2MDescriptor(AuthorRelation, "instance"))
 
         book = Book(title="Test Book", author="Test Author")
         manager = book.test_gen_authors
-        self.assertIsInstance(manager, _GenericRelationManager)
+        self.assertIsInstance(manager, GenericM2MManager)
 
     def test_manager_has_correct_instance(self):
         """Test that the manager has the correct instance reference."""
         AuthorRelation = custom_relation_factory(Author, related_name="test_gen_inst")
-        Book.add_to_class("test_gen_inst_authors", GenericRelationDescriptor(AuthorRelation))
+        Book.add_to_class("test_gen_inst_authors", GenericM2MDescriptor(AuthorRelation, "instance"))
 
         book = Book(title="Test Book", author="Test Author")
         manager = book.test_gen_inst_authors
         self.assertEqual(manager.instance, book)
 
-    def test_manager_has_correct_owner(self):
-        """Test that the manager has the correct owner."""
-        AuthorRelation = custom_relation_factory(Author, related_name="test_gen_owner")
-        Book.add_to_class("test_gen_owner_authors", GenericRelationDescriptor(AuthorRelation))
-
-        book = Book(title="Test Book", author="Test Author")
-        manager = book.test_gen_owner_authors
-        self.assertEqual(manager.owner, Book)
-
     def test_descriptor_stores_relation_model(self):
         """Test that the descriptor stores the relation model correctly."""
         AuthorRelation = custom_relation_factory(Author, related_name="test_gen_store")
 
-        descriptor = GenericRelationDescriptor(AuthorRelation)
+        descriptor = GenericM2MDescriptor(AuthorRelation, "instance")
         self.assertEqual(descriptor.relation_model, AuthorRelation)
 
 
