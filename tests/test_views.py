@@ -1,6 +1,8 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
 
 from djangocms_custom_content.contrib.people.models import Person, PersonContent
 from djangocms_custom_content.views import (
@@ -73,3 +75,35 @@ class ViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(self.person_content._meta.model_name, response.context_data)
         self.assertEqual(response.context_data[self.person_content._meta.model_name], self.person_content)
+
+    def test_detail_view_query_count_without_select_related(self):
+        """Test query count for detail view without CustomDetailViewMixin."""
+        from django.views.generic import DetailView
+
+        view_class = type("PlainDetailView", (DetailView,), {"model": PersonContent})
+        view = view_class()
+        view.request = self.factory.get("/")
+        view.kwargs = {"pk": self.person_content.pk}
+
+        with CaptureQueriesContext(connection) as ctx:
+            obj = view.get_object()
+            # Access the grouper to trigger lazy loading
+            _ = obj.person
+
+        # Without select_related: 1 query for PersonContent + 1 for Person
+        self.assertEqual(len(ctx), 2)
+
+    def test_detail_view_query_count_with_select_related(self):
+        """Test query count for detail view with CustomDetailViewMixin."""
+        view_class = custom_detail_view_factory(PersonContent)
+        view = view_class()
+        view.request = self.factory.get("/")
+        view.kwargs = {"pk": self.person_content.pk}
+
+        with CaptureQueriesContext(connection) as ctx:
+            obj = view.get_object()
+            # Access the grouper - should not trigger another query
+            _ = obj.person
+
+        # With select_related: 1 query for PersonContent + Person
+        self.assertEqual(len(ctx), 1)
