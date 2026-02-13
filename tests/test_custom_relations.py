@@ -242,3 +242,92 @@ class FactoryBehaviorTestCase(TestCase):
         self.assertIsInstance(manager, _InverseRelationManager)
         self.assertIs(manager.instance, author)
         self.assertIs(manager.relation_model, AuthorRelation)
+
+
+class FlatCategoryRelateToTestCase(TestCase):
+    """Test case for FlatCategory relate_to configuration with BlogPost."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        from djangocms_custom_content.contrib.blog.models import BlogPost
+        from djangocms_custom_content.contrib.categories.models import FlatCategory, FlatCategoryRelation
+
+        self.BlogPost = BlogPost
+        self.FlatCategory = FlatCategory
+        self.FlatCategoryRelation = FlatCategoryRelation
+
+    def test_flat_category_relation_model_created(self):
+        """Test that FlatCategoryRelation model is created."""
+        self.assertIsNotNone(self.FlatCategoryRelation)
+        self.assertTrue(issubclass(self.FlatCategoryRelation, AbstractCustomRelation))
+
+    def test_blog_post_has_categories_accessor(self):
+        """Test that BlogPost has a categories accessor from relate_to."""
+        blog_post = self.BlogPost()
+        self.assertTrue(hasattr(blog_post, "categories"))
+
+    def test_categories_accessor_is_manager(self):
+        """Test that the categories accessor provides a manager interface."""
+        blog_post = self.BlogPost.objects.create()
+        categories = blog_post.categories
+        self.assertTrue(hasattr(categories, "all"))
+        self.assertTrue(hasattr(categories, "add"))
+        self.assertTrue(hasattr(categories, "remove"))
+        self.assertTrue(hasattr(categories, "clear"))
+
+    def test_add_category_to_blog_post(self):
+        """Test adding a category to a blog post."""
+        blog_post = self.BlogPost.objects.create()
+        category = self.FlatCategory.objects.create(title="Tech", slug="tech")
+
+        blog_post.categories.add(category)
+
+        # Verify the relation was created
+        ct = ContentType.objects.get_for_model(self.BlogPost)
+        relation = self.FlatCategoryRelation.objects.filter(instance=category, content_type=ct, object_id=blog_post.pk)
+        self.assertTrue(relation.exists())
+
+    def test_add_multiple_categories_to_blog_post(self):
+        """Test adding multiple categories to a blog post."""
+        blog_post = self.BlogPost.objects.create()
+        category1 = self.FlatCategory.objects.create(title="Tech", slug="tech")
+        category2 = self.FlatCategory.objects.create(title="Design", slug="design")
+
+        blog_post.categories.add(category1, category2)
+
+        categories = list(blog_post.categories.all())
+        self.assertEqual(len(categories), 2)
+        self.assertIn(category1, categories)
+        self.assertIn(category2, categories)
+
+    def test_remove_category_from_blog_post(self):
+        """Test removing a category from a blog post."""
+        blog_post = self.BlogPost.objects.create()
+        category1 = self.FlatCategory.objects.create(title="Tech", slug="tech")
+        category2 = self.FlatCategory.objects.create(title="Design", slug="design")
+
+        blog_post.categories.add(category1, category2)
+        blog_post.categories.remove(category1)
+
+        categories = list(blog_post.categories.all())
+        self.assertEqual(len(categories), 1)
+        self.assertNotIn(category1, categories)
+        self.assertIn(category2, categories)
+
+    def test_clear_all_categories(self):
+        """Test clearing all categories from a blog post."""
+        blog_post = self.BlogPost.objects.create()
+        category1 = self.FlatCategory.objects.create(title="Tech", slug="tech")
+        category2 = self.FlatCategory.objects.create(title="Design", slug="design")
+
+        blog_post.categories.add(category1, category2)
+        blog_post.categories.clear()
+
+        categories = list(blog_post.categories.all())
+        self.assertEqual(len(categories), 0)
+
+    def test_empty_categories_list_initially(self):
+        """Test that a blog post starts with no categories."""
+        blog_post = self.BlogPost.objects.create()
+        categories = list(blog_post.categories.all())
+        self.assertEqual(len(categories), 0)

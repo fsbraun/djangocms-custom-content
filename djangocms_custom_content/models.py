@@ -435,7 +435,10 @@ class GenericM2MManager:
 
     def _related_queryset(self):
         """Return a queryset of the actual related objects (not relations)."""
-        return self.through_model._meta.get_field("instance").related_model.admin_manager.filter(
+        related_model = self.through_model._meta.get_field("instance").related_model
+        # Use admin_manager if available (for versioned content models), otherwise use objects
+        manager = getattr(related_model, "admin_manager", None) or related_model.objects
+        return manager.filter(
             pk__in=self.through_model.objects.filter(
                 content_type=self.content_type, object_id=self.instance.pk
             ).values_list(self.related_field_name, flat=False)
@@ -467,6 +470,69 @@ class GenericM2MDescriptor:
         if instance is None:
             return self
         return GenericM2MManager(instance, self.relation_model, self.related_field_name)
+
+
+class DummyM2MManager:
+    """
+    Dummy manager for simulating empty generic M2M relationships.
+
+    This manager provides a no-op interface that simulates an empty relationship,
+    used when a related model is not available or does not exist.
+
+    All operations are no-ops and queries return empty results.
+    """
+
+    def __init__(self, instance: models.Model, accessor: str):
+        """Initialize the dummy manager.
+
+        Args:
+            ``instance``: The model instance this manager is bound to
+            ``accessor``: The name of the accessor attribute
+        """
+        self.instance = instance
+        self.accessor = accessor
+
+    def all(self):
+        """Return an empty list (no relations exist)."""
+        return []
+
+    def add(self, *objs):
+        """No-op: does nothing."""
+        pass
+
+    def remove(self, *objs):
+        """No-op: does nothing."""
+        pass
+
+    def clear(self):
+        """No-op: does nothing."""
+        pass
+
+
+class DummyM2MDescriptor:
+    """
+    Descriptor providing a dummy interface for unavailable generic M2M relations.
+
+    This descriptor is used when a related model specified in m2m_relations
+    cannot be found or is not yet available. It provides a safe interface that
+    returns empty results instead of raising errors.
+
+    The descriptor returns itself when accessed on the class, and returns a
+    DummyM2MManager instance when accessed on a model instance.
+    """
+
+    def __init__(self, accessor: str):
+        """Initialize the descriptor.
+
+        Args:
+            ``accessor``: The name of the accessor attribute
+        """
+        self.accessor = accessor
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return DummyM2MManager(instance, self.accessor)
 
 
 def custom_relation_factory(model: type[models.Model], related_name: str | None = None) -> type[models.Model]:

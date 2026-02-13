@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from cms.app_base import CMSApp, CMSAppConfig
+from cms.app_base import CMSApp, CMSAppConfig, CMSAppExtension
 from cms.apphook_pool import apphook_pool
 from cms.utils import get_current_site
 from cms.utils.i18n import get_language_tuple
@@ -20,9 +20,21 @@ def _get_absolute_url_factory(app_name: str, slug_field: str, view_name: str) ->
     return _get_absolute_url
 
 
+def _is_relation_for(model: type[models.Model]):
+    from djangocms_custom_content.models import AbstractCustomRelation
+
+    try:
+        if issubclass(model, AbstractCustomRelation):
+            return model._meta.get_field("instance").related_model
+    except FieldDoesNotExist:
+        pass
+    return None
+
+
 class CustomContentConfig(CMSAppConfig):
     cms_enabled = True
     djangocms_versioning_enabled = True
+    djangocms_custom_content_enabled = True
 
     def __init__(self, args, **wkargs):
         from djangocms_custom_content.models import AbstractCustomContent
@@ -43,6 +55,7 @@ class CustomContentConfig(CMSAppConfig):
         self.cms_toolbar_enabled_models = []
         self.cms_apphook_dict = {}
         self.custom_content_groupers = {}
+        self.m2m_relations = []
 
         if hasattr(self, "get_contract"):
             self.versioning_contract = self.get_contract("djangocms_versioning")
@@ -70,7 +83,10 @@ class CustomContentConfig(CMSAppConfig):
         enable_frontend_editing = getattr(cms_config, "enable_frontend_editing", False)
         if enable_frontend_editing:
             # Add frontend editable models
-            self.cms_toolbar_enabled_models.append((model, render_frontend_editor, grouper_field_name))
+            if grouper_field_name:
+                self.cms_toolbar_enabled_models.append((model, render_frontend_editor, grouper_field_name))
+            else:
+                self.cms_toolbar_enabled_models.append((model, render_frontend_editor))
 
     def register_versioning(self, model: type[models.Model], grouper_field_name: str, has_language_field: bool):
         cms_config = getattr(model, "CMSConfig", None)
@@ -121,63 +137,68 @@ class CustomContentConfig(CMSAppConfig):
                     ),
                 )
 
-    @staticmethod
-    def is_relation_for(model: type[models.Model]):
-        from djangocms_custom_content.models import AbstractCustomRelation
-
-        try:
-            if issubclass(model, AbstractCustomRelation):
-                print(model.__name__, model._meta.get_field("instance").related_model)
-                return model._meta.get_field("instance").related_model
-        except FieldDoesNotExist:
-            pass
-        return None
-
-    def register_m2m_relation(self, model: type[models.Model]):
+    def register_m2m_relations(self, model: type[models.Model]):
         """
         Register many-to-many relations defined in the model's CMSConfig.
 
-        This method processes the ``m2m_relations`` attribute from a model's CMSConfig
-        and sets up reverse accessors on the target models. Each relation defined as:
+        This method processes the ``relate_to`` and ``invite_relation_from``attributes from
+        a model's CMSConfig and sets up reverse accessors on the target models. Each relation defined as::
 
-            m2m_relations = [("accessor_name", "app_label.ModelName")]
+            relate_to = [("accessor_name", "app_label.ModelName")]
 
         Will add an ``accessor_name`` property to the target model that returns a
         GenericM2MManager for managing the relationship.
 
-        The target model will be able to access linked objects via:
-            target_instance.accessor_name.all()
-            target_instance.accessor_name.add(obj)
-            target_instance.accessor_name.remove(obj)
+        The target model will be able to access linked objects via::
+
+            target_instance.accessor_name.all()  # Queryset
+            target_instance.accessor_name.add(obj, ...)
+            target_instance.accessor_name.remove(obj, ...)
             target_instance.accessor_name.clear()
+
+        The model itself will get a descriptor ``relations``::
+
+        ``invite_relation_from`` will create an inverse relation::
+
+            model_instance.accessor_name.all()  # Queryset
+            model_instance.accessor_name.add(obj, ...)
+            model_instance.accessor_name.remove(obj, ...)
+            model_instance.accessor_name.clear()
+
+        It will fail silently and add a dummy accessor if the target model
+        does not provide a generic m2m relation created via ``custom_relation_factory``.
 
         Args:
             model: The content model to register m2m relations for
 
         Raises:
-            ImproperlyConfigured: If m2m_relations is defined but the relation model
+            ImproperlyConfigured: If relate_to is defined but the relation model
                                   (created via custom_relation_factory) is not found
         """
         from djangocms_custom_content.models import GenericM2MDescriptor
 
         cms_config = getattr(model, "CMSConfig", None)
-        m2m_relations = getattr(cms_config, "m2m_relations", [])
-        if m2m_relations:
-            relation_model = next(
-                (_model for _model in apps.get_models() if self.is_relation_for(_model) is model), None
-            )
+        relate_to = getattr(cms_config, "relate_to", [])
+        if relate_to:
+            relation_model = next((_model for _model in apps.get_models() if _is_relation_for(_model) is model), None)
             if not relation_model:
                 raise ImproperlyConfigured(
                     f"Use {model.__name__}Relation = custom_relation_factory({model.__name__}) in your models.py to create a "
-                    "m2m relation model allowing for CMSConfig.m2m_relations"
+                    "m2m relation model allowing for CMSConfig.relate_to"
                 )
-            for reverse_name, relation in m2m_relations:
+            for reverse_name, relation in relate_to:
                 try:
                     related_model = apps.get_model(relation)
                     related_model.add_to_class(reverse_name, GenericM2MDescriptor(relation_model, "instance"))
                 except LookupError:
                     # Related model not installed, skip registration
                     pass
+
+        invite_m2m_relations = getattr(cms_config, "invite_m2m_relations", [])
+        self.m2m_relations += [
+            (f"{model._meta.app_label}.{model.__name__}", accessor, target)
+            for accessor, target in invite_m2m_relations
+        ]
 
     def register(self, model: type[models.Model]):
         from djangocms_custom_content.models import AbstractCustomGrouper
@@ -190,15 +211,45 @@ class CustomContentConfig(CMSAppConfig):
             ),
             "",
         )
-        grouper_model = model._meta.get_field(grouper_field_name).related_model
-        has_language_field = any(f.name == "language" for f in model._meta.get_fields())
+        has_language_field = False
+        if grouper_field_name:
+            grouper_model = model._meta.get_field(grouper_field_name).related_model
+            has_language_field = any(f.name == "language" for f in model._meta.get_fields())
 
-        self.custom_content_groupers[model] = (grouper_model, grouper_field_name, has_language_field)
+            self.custom_content_groupers[model] = (grouper_model, grouper_field_name, has_language_field)
 
-        if has_language_field and grouper_model is not None:
-            self.register_extra_grouping_field(grouper_model)
+            if has_language_field and grouper_model is not None:
+                self.register_extra_grouping_field(grouper_model)
 
         self.register_frontend_editing(model, grouper_field_name)
         self.register_versioning(model, grouper_field_name, has_language_field)
-        self.register_apphook(model, grouper_model.__name__)
-        self.register_m2m_relation(model)
+        if grouper_field_name:
+            self.register_apphook(model, grouper_model.__name__)
+        else:
+            self.register_apphook(model, model.__name__)
+        self.register_m2m_relations(model)
+
+
+class CustomContentExtension(CMSAppExtension):
+    # Allow extension of apps that set djangocms_custom_content_enabled = True
+    # No contract object needed.
+    contract = "djangocms_custom_content", None
+
+    def configure_app(self, cms_config):
+        from djangocms_custom_content.models import DummyM2MDescriptor, GenericM2MDescriptor
+
+        m2m_relations = getattr(cms_config, "m2m_relations", {})
+        for model, accessor, target in m2m_relations:
+            target_class = apps.get_model(target)
+            relation_model = next(
+                (_model for _model in apps.get_models() if _is_relation_for(_model) is target_class), None
+            )
+            if not relation_model:
+                #  Target class does not support m2m_relations
+                continue
+            try:
+                model_class = apps.get_model(model)
+                model_class.add_to_class(accessor, GenericM2MDescriptor(relation_model, "instance"))
+            except LookupError:
+                # Related model not installed, skip registration
+                model_class.add_to_class(accessor, DummyM2MDescriptor(accessor))

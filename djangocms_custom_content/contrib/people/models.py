@@ -40,7 +40,6 @@ class PersonContent(AbstractCustomContent):
         enable_versioning = True
         enable_frontend_editing = True
         apphook = True
-        m2m_relations = [("author_set", "djangocms_custom_content_blog.BlogPost")]
 
     def __str__(self):
         return self.name
@@ -54,4 +53,4 @@ class PersonTeaser(CMSPlugin):
         verbose_name = _("Person teaser")
 
 
-PersonRelation = custom_relation_factory(PersonContent)
+PersonRelation = custom_relation_factory(Person)

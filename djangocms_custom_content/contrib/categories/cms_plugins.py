@@ -2,12 +2,12 @@ from cms.plugin_base import CMSPluginBase
 from cms.plugin_pool import plugin_pool
 from django.utils.translation import gettext_lazy as _
 
-from .models import Category, CategoryList
+from .models import FlatCategory, FlatCategoryList
 
 
 @plugin_pool.register_plugin
 class CategoryListPlugin(CMSPluginBase):
-    model = CategoryList
+    model = FlatCategoryList
     name = _("Categories")
     render_template = "djangocms_custom_content/contrib/categories/category_list.html"
     cache = True
@@ -17,7 +17,7 @@ class CategoryListPlugin(CMSPluginBase):
 
     def render(self, context, instance, placeholder):
         context = super().render(context, instance, placeholder)
-        qs = Category.objects.all()
+        qs = FlatCategory.objects.all()
         if instance.only_featured:
             qs = qs.filter(is_featured=True)
         if instance.limit:

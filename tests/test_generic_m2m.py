@@ -3,6 +3,7 @@ Tests for GenericM2MManager and GenericM2MDescriptor.
 """
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.test import TransactionTestCase
@@ -14,6 +15,7 @@ from djangocms_custom_content.models import (
 )
 from tests.test_app.models import Article, Author, AuthorRelation, Book, BookRelation
 
+User = get_user_model()
 pytestmark = pytest.mark.django_db
 
 
@@ -147,9 +149,11 @@ class GenericM2MManagerTestCase(TransactionTestCase):
 
         manager.add(self.book1, self.book2)
 
-        # The manager expects related models with an admin_manager.
-        with pytest.raises(AttributeError, match="admin_manager"):
-            manager.all()
+        # The manager should now work with models that have admin_manager or use objects
+        related = list(manager.all())
+        self.assertEqual(len(related), 2)
+        self.assertIn(self.book1, related)
+        self.assertIn(self.book2, related)
 
     def test_manager_with_different_instances(self):
         """Test that managers for different instances are independent."""
@@ -353,3 +357,98 @@ class GenericM2MEdgeCasesTestCase(TransactionTestCase):
         # Accessing on an instance should return a manager
         result = descriptor.__get__(self.book, Book)
         self.assertIsInstance(result, GenericM2MManager)
+
+
+class BlogPostAuthorsTestCase(TransactionTestCase):
+    """Test case for BlogPostContent authors M2M relation."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        from djangocms_custom_content.contrib.blog.models import BlogPost, BlogPostContent
+        from djangocms_custom_content.contrib.people.models import Person, PersonContent
+
+        self.superuser = User.objects.create_superuser(
+            username="admin", email="admin@example.com", password="password"
+        )
+
+        # Create blog post
+        self.blog_post = BlogPost.objects.create()
+        self.blog_post_content = BlogPostContent.objects.with_user(self.superuser).create(
+            post=self.blog_post,
+            title="Test Blog Post",
+            slug="test-blog-post",
+            excerpt="Test excerpt",
+            body="Test body",
+            language="en",
+        )
+
+        # Create persons
+        self.person1 = Person.objects.create()
+        self.person_content1 = PersonContent.objects.with_user(self.superuser).create(
+            person=self.person1,
+            name="Author One",
+            role="Writer",
+            description="First author",
+            slug="author-one",
+        )
+
+        self.person2 = Person.objects.create()
+        self.person_content2 = PersonContent.objects.with_user(self.superuser).create(
+            person=self.person2,
+            name="Author Two",
+            role="Editor",
+            description="Second author",
+            slug="author-two",
+        )
+
+    def test_blog_post_content_has_authors_attribute(self):
+        """Test that BlogPostContent has an authors attribute."""
+        self.assertTrue(hasattr(self.blog_post_content, "authors"))
+
+    def test_authors_attribute_is_manager(self):
+        """Test that the authors attribute provides a manager interface."""
+        authors = self.blog_post_content.authors
+        self.assertTrue(hasattr(authors, "all"))
+        self.assertTrue(hasattr(authors, "add"))
+        self.assertTrue(hasattr(authors, "remove"))
+        self.assertTrue(hasattr(authors, "clear"))
+
+    def test_add_author_to_blog_post(self):
+        """Test adding a single author to a blog post."""
+        self.blog_post_content.authors.add(self.person1)
+
+        authors = list(self.blog_post_content.authors.all())
+        self.assertEqual(len(authors), 1)
+        self.assertIn(self.person1, authors)
+
+    def test_add_multiple_authors_to_blog_post(self):
+        """Test adding multiple authors to a blog post."""
+        self.blog_post_content.authors.add(self.person1, self.person2)
+
+        authors = list(self.blog_post_content.authors.all())
+        self.assertEqual(len(authors), 2)
+        self.assertIn(self.person1, authors)
+        self.assertIn(self.person2, authors)
+
+    def test_remove_author_from_blog_post(self):
+        """Test removing an author from a blog post."""
+        self.blog_post_content.authors.add(self.person1, self.person2)
+        self.blog_post_content.authors.remove(self.person1)
+
+        authors = list(self.blog_post_content.authors.all())
+        self.assertEqual(len(authors), 1)
+        self.assertNotIn(self.person1, authors)
+        self.assertIn(self.person2, authors)
+
+    def test_clear_all_authors(self):
+        """Test clearing all authors from a blog post."""
+        self.blog_post_content.authors.add(self.person1, self.person2)
+        self.blog_post_content.authors.clear()
+
+        authors = list(self.blog_post_content.authors.all())
+        self.assertEqual(len(authors), 0)
+
+    def test_empty_authors_list_initially(self):
+        """Test that a blog post starts with no authors."""
+        authors = list(self.blog_post_content.authors.all())
+        self.assertEqual(len(authors), 0)
