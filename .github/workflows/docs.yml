@@ -60,4 +60,5 @@ jobs:
       - name: Check spelling
         run: |
           cd docs
+          make install
           make spelling
