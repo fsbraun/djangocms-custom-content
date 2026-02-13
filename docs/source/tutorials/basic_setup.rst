@@ -89,8 +89,8 @@ Create ``my_content/models.py``:
 
 The ``CMSConfig`` class enables:
 
-- ``editable = True`` - Content can be edited on the frontend in django CMS
-- ``versionable = True`` - Track and manage multiple versions by language
+- ``enable_frontend_editing = True`` - Content can be edited on the frontend in django CMS
+- ``enable_versioning = True`` - Track and manage multiple versions by language
 
 Step 5: Register with Admin
 ----------------------------

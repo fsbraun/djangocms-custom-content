@@ -3,29 +3,33 @@ Model with M2M Relations Tutorial
 
 Learn how to create flexible many-to-many relationships between your content models.
 
-This tutorial builds on the :doc:`blog_example` tutorial.
+This tutorial builds on the :doc:`article_with_plugins` tutorial.
 
 Overview
 --------
 
-We'll add authors to our blog posts using the ``invite_m2m_relations`` feature:
+We'll add authors to our articles using the ``invite_m2m_relations`` feature:
 
 - Create a ``Person`` model to represent authors
-- Link ``Person`` objects to blog posts using generic M2M relations
-- Display authors on blog post pages
+- Link ``Person`` objects to articles using generic M2M relations
+- Display authors on article pages
 
 Step 1: Create the Person Model
 --------------------------------
 
-Add to ``my_blog/models.py``:
+Add to ``my_content/models.py``:
 
 .. code-block:: python
 
+    from django.db import models
     from djangocms_custom_content.models import (
         AbstractCustomGrouper,
         AbstractCustomContent,
         custom_relation_factory,
     )
+
+    # Existing Article and ArticleContent models...
+    # (from the basic_setup tutorial)
 
     class Person(AbstractCustomGrouper):
         """An author or contributor."""
@@ -34,7 +38,8 @@ Add to ``my_blog/models.py``:
             verbose_name_plural = "Authors"
 
         def __str__(self):
-            return self.get_admin_content().name if self.get_admin_content() else "Unknown"
+            person_content = self.get_admin_content()
+            return person_content.full_name if person_content else "Unknown"
 
     class PersonContent(AbstractCustomContent):
         """Author profile information."""
@@ -46,8 +51,6 @@ Add to ``my_blog/models.py``:
 
         class CMSConfig:
             enable_versioning = True
-            # Add 'authors' accessor to BlogPostContent
-            invite_m2m_relations = [("authors", "my_blog.Person")]
 
         def __str__(self):
             return self.full_name
@@ -56,10 +59,37 @@ Add to ``my_blog/models.py``:
     # Note: Create relation factory for the Grouper (Person), not Content model
     PersonRelation = custom_relation_factory(Person)
 
-Step 2: Register with Admin
-----------------------------
+Step 2: Configure ArticleContent for M2M
+------------------------------------------
 
-Add to ``my_blog/admin.py``:
+Update the ``ArticleContent`` model in ``my_content/models.py`` to point to Person:
+
+.. code-block:: python
+
+    class ArticleContent(AbstractCustomContent):
+        """The editable article content."""
+        article = models.ForeignKey(Article, on_delete=models.CASCADE)
+        title = models.CharField(max_length=200)
+        slug = models.SlugField()
+        body = models.TextField()
+
+        class CMSConfig:
+            editable = True
+            versionable = True
+            apphook = True
+            # Request authors from the Person model
+            invite_m2m_relations = [("authors", "my_content.Person")]
+
+        def __str__(self):
+            return self.title
+
+        def __str__(self):
+            return self.title
+
+Step 3: Register Person with Admin
+-----------------------------------
+
+Add to ``my_content/admin.py``:
 
 .. code-block:: python
 
@@ -73,115 +103,123 @@ Add to ``my_blog/admin.py``:
     class PersonContentAdmin(admin.ModelAdmin):
         list_display = ("full_name", "email")
 
-Step 3: Use M2M Relations in Views
------------------------------------
+Step 4: Update Article Detail Template with Authors
+----------------------------------------------------
 
-Add to ``my_blog/views.py``:
-
-.. code-block:: python
-
-    from django.shortcuts import render, get_object_or_404
-    from .models import BlogPost, BlogPostContent
-
-    def blog_post_detail(request, slug):
-        """Display a blog post with its authors."""
-        blog_post_content = get_object_or_404(
-            BlogPostContent,
-            slug=slug,
-            language=request.LANGUAGE_CODE
-        )
-
-        # Get all authors linked to this post
-        authors = blog_post_content.authors.all()
-
-        return render(
-            request,
-            "my_blog/post_detail.html",
-            {
-                "post": blog_post_content,
-                "authors": authors,
-            }
-        )
-
-Step 4: Create Template with Authors
--------------------------------------
-
-Update ``my_blog/templates/my_blog/post_detail.html``:
+Update ``my_content/templates/my_content/article_detail.html`` to display authors.
+The generic detail view automatically provides the article object and you can access authors via the ``invite_m2m_relations`` accessor:
 
 .. code-block:: django
 
-    <article class="blog-post">
-        <h1>{{ post.title }}</h1>
+    {% extends "base.html" %}
+    {% load cms_tags %}
 
-        <div class="post-meta">
-            <time>{{ post.published_at|date:"F j, Y" }}</time>
-        </div>
+    {% block content %}
+        {% cms_edit_on %}
+        <article class="article">
+            <h1>{{ article.title }}</h1>
 
-        <div class="authors">
-            <h3>Authors</h3>
-            <ul>
-                {% for author in authors %}
-                    <li>
-                        {% if author.avatar %}
-                            <img src="{{ author.avatar.url }}" alt="{{ author.full_name }}">
-                        {% endif %}
-                        <div>
-                            <strong>{{ author.full_name }}</strong>
-                            {% if author.email %}
-                                <p><a href="mailto:{{ author.email }}">{{ author.email }}</a></p>
-                            {% endif %}
-                            <p>{{ author.bio }}</p>
-                        </div>
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
+            {% if article.authors.all %}
+                <div class="authors">
+                    <h3>Authors</h3>
+                    <ul class="author-list">
+                        {% for author in article.authors.all %}
+                            <li class="author">
+                                {% if author.avatar %}
+                                    <img src="{{ author.avatar.url }}"
+                                         alt="{{ author.full_name }}"
+                                         class="author-avatar">
+                                {% endif %}
+                                <div class="author-info">
+                                    <strong>{{ author.full_name }}</strong>
+                                    {% if author.bio %}
+                                        <p class="bio">{{ author.bio }}</p>
+                                    {% endif %}
+                                    {% if author.email %}
+                                        <p><a href="mailto:{{ author.email }}">{{ author.email }}</a></p>
+                                    {% endif %}
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
 
-        <div class="content">
-            {{ post.body|safe }}
-        </div>
-    </article>
+            <div class="content">
+                {{ article.body|safe }}
+            </div>
+        </article>
+        {% cms_edit_off %}
+    {% endblock %}
 
 Step 5: Create Migrations
 --------------------------
 
 .. code-block:: bash
 
-    python manage.py makemigrations my_blog
-    python manage.py migrate my_blog
+    python manage.py makemigrations my_content
+    python manage.py migrate my_content
 
-Step 6: Link Authors to Posts
-------------------------------
+Step 6: Link Authors to Articles
+---------------------------------
 
 Via Django shell:
 
 .. code-block:: python
 
-    from my_blog.models import BlogPostContent, Person
+    from my_content.models import ArticleContent, Person
 
-    blog_post_content = BlogPostContent.objects.first()
+    article = ArticleContent.objects.first()
     person = Person.objects.first()
 
-    # Add an author to the post
-    blog_post_content.authors.add(person)
+    # Add an author to the article
+    article.authors.add(person)
 
-    # Get all authors of a post
-    all_authors = blog_post_content.authors.all()
+    # Get all authors of an article
+    all_authors = article.authors.all()
 
     # Remove an author
-    blog_post_content.authors.remove(person)
+    article.authors.remove(person)
 
     # Clear all authors
-    blog_post_content.authors.clear()
+    article.authors.clear()
 
 Via Django admin:
 
-1. Edit a ``BlogPostContent`` object
+1. Edit an ``ArticleContent`` object
 2. Use the ``authors`` accessor to add/remove Person objects
 3. Save
 
-Next Steps:
+Key Concepts
+-----------
 
-- Learn more about :doc:`../how-to/m2m_relations` and both ``relate_to`` and ``invite_m2m_relations``
-- Explore :doc:`../explanation/relationships` to understand how M2M relations work
+**invite_m2m_relations**
+
+The ``invite_m2m_relations`` configuration tells ArticleContent:
+
+- "I want to link to Person objects"
+- "Please add an ``authors`` accessor to my instances"
+- "Use a generic through model to handle the relationship"
+
+This creates a bidirectional relationship:
+
+.. code-block:: python
+
+    # From ArticleContent side:
+    article.authors.all()  # Get authors of this article
+
+    # There's no direct reverse accessor on Person
+    # (it doesn't know about articles)
+
+**Generic M2M Benefits**
+
+- One Person can be linked to many ArticleContent instances
+- The same Person model can be linked to other content types without modification
+- The through model (PersonRelation) is shared across all relations
+
+Next Steps
+----------
+
+- Learn more about :doc:`../how-to/m2m_relations` and the difference between ``relate_to`` and ``invite_m2m_relations``
+- Explore :doc:`../explanation/relationships` to understand how generic M2M relations work under the hood
 - Check :doc:`../reference/index` for complete API reference
