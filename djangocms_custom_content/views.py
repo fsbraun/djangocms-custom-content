@@ -39,16 +39,6 @@ def custom_detail_view_factory(model: type[models.Model]) -> type[DetailView]:
     )
 
 
-def frontend_view_factory(model: type[models.Model]) -> type[DetailView]:
-    return type(
-        f"{model.__name__}DetailView",
-        (CustomDetailViewMixin, FrontendEditableMixin, DetailView),
-        {
-            "model": model,
-        },
-    )
-
-
 def render_frontend_editor(request: HttpRequest, content: models.Model) -> HttpResponse:
     template = content.get_template()
     context = {content._meta.model_name: content}

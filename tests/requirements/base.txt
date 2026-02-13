@@ -1,5 +1,6 @@
 coverage
 pytest
+pytest-cov
 pytest-django
 tox
 isort

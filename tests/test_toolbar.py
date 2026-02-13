@@ -1,5 +1,5 @@
 import pytest
-from cms.cms_toolbars import ADMIN_MENU_IDENTIFIER
+from cms.cms_toolbars import ADMIN_MENU_IDENTIFIER, ADMINISTRATION_BREAK, SHORTCUTS_BREAK
 from cms.toolbar.toolbar import CMSToolbar as ToolbarClass
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -12,6 +12,46 @@ from djangocms_custom_content.contrib.people.models import Person, PersonContent
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
+
+
+class _FakeMenuItem:
+    def __init__(self, name=None, identifier=None):
+        self.name = name
+        self.identifier = identifier
+        self.index = None
+
+
+class _FakeMenu:
+    def __init__(self):
+        self._items = []
+
+    def _reindex(self):
+        for idx, item in enumerate(self._items):
+            item.index = idx
+
+    def find_first(self, _item_type, identifier=None):
+        for item in self._items:
+            if getattr(item, "identifier", None) == identifier:
+                return item
+        return None
+
+    def add_break(self, identifier, position=None):
+        item = _FakeMenuItem(identifier=identifier)
+        if position is None:
+            self._items.append(item)
+        else:
+            self._items.insert(position, item)
+        self._reindex()
+        return item
+
+    def add_item(self, name=None):
+        item = _FakeMenuItem(name=name)
+        self._items.append(item)
+        self._reindex()
+        return item
+
+    def get_items(self):
+        return list(self._items)
 
 
 class CustomContentToolbarTestCase(TestCase):
@@ -331,3 +371,64 @@ class CustomContentToolbarTestCase(TestCase):
         # Should have blog shortcut with view permission
         has_blog = any("blog" in name for name in item_names)
         self.assertTrue(has_blog, f"Blog post shortcut should be added with view permission. Found: {item_names}")
+
+
+class GetInsertPositionTests(TestCase):
+    """Tests for CustomContentToolbar.get_insert_position."""
+
+    def test_adds_breaks_when_missing(self):
+        menu = _FakeMenu()
+
+        position = CustomContentToolbar.get_insert_position(menu, "Foo")
+
+        start = menu.find_first(None, SHORTCUTS_BREAK)
+        end = menu.find_first(None, ADMINISTRATION_BREAK)
+        self.assertIsNotNone(start)
+        self.assertIsNotNone(end)
+        self.assertLess(start.index, end.index)
+        self.assertEqual(position, end.index)
+
+    def test_adds_admin_break_when_missing(self):
+        menu = _FakeMenu()
+        menu.add_break(SHORTCUTS_BREAK)
+
+        position = CustomContentToolbar.get_insert_position(menu, "Foo")
+
+        end = menu.find_first(None, ADMINISTRATION_BREAK)
+        self.assertIsNotNone(end)
+        self.assertEqual(position, end.index)
+
+    def test_inserts_alphabetically_between_breaks(self):
+        menu = _FakeMenu()
+        menu.add_break(SHORTCUTS_BREAK)
+        menu.add_item(name="Alpha")
+        menu.add_item(name="Zulu")
+        menu.add_break(ADMINISTRATION_BREAK)
+
+        position = CustomContentToolbar.get_insert_position(menu, "Bravo")
+
+        start = menu.find_first(None, SHORTCUTS_BREAK)
+        self.assertEqual(position, start.index + 2)
+
+    def test_returns_end_when_name_is_last(self):
+        menu = _FakeMenu()
+        menu.add_break(SHORTCUTS_BREAK)
+        menu.add_item(name="Alpha")
+        menu.add_item(name="Zulu")
+        menu.add_break(ADMINISTRATION_BREAK)
+
+        position = CustomContentToolbar.get_insert_position(menu, "Zulu")
+
+        end = menu.find_first(None, ADMINISTRATION_BREAK)
+        self.assertEqual(position, end.index)
+
+    def test_ignores_items_without_name(self):
+        menu = _FakeMenu()
+        menu.add_break(SHORTCUTS_BREAK)
+        menu.add_item(name=None)
+        menu.add_break(ADMINISTRATION_BREAK)
+
+        position = CustomContentToolbar.get_insert_position(menu, "Alpha")
+
+        end = menu.find_first(None, ADMINISTRATION_BREAK)
+        self.assertEqual(position, end.index)

@@ -2,13 +2,17 @@ from unittest import skipIf
 
 import pytest
 from cms import __version__ as cms_version
-from django.contrib.admin.sites import site
+from cms.utils.urlutils import admin_reverse
+from django.apps import apps
+from django.contrib import admin
+from django.contrib.admin.sites import AdminSite, site
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from djangocms_custom_content.admin import CustomGrouperAdminMixin
 from djangocms_custom_content.contrib.blog.admin import BlogPostAdmin
 from djangocms_custom_content.contrib.blog.models import BlogPost, BlogPostContent
 from djangocms_custom_content.contrib.people.admin import PersonAdmin
@@ -337,6 +341,8 @@ class CustomGrouperAdminMixinTestCase(TestCase):
         )
         self.blog_admin = BlogPostAdmin(BlogPost, site)
         self.person_admin = PersonAdmin(Person, site)
+        self.factory = RequestFactory()
+        self.admin_site = AdminSite()
 
     def test_custom_urls_exist_blog(self):
         """Test that custom URLs are added for blog admin."""
@@ -360,3 +366,69 @@ class CustomGrouperAdminMixinTestCase(TestCase):
         self.assertTrue(hasattr(self.person_admin, "breadcrumb_redir"))
         self.assertTrue(callable(self.blog_admin.breadcrumb_redir))
         self.assertTrue(callable(self.person_admin.breadcrumb_redir))
+
+    def test_get_queryset_without_content_model(self):
+        class NoContentAdmin(CustomGrouperAdminMixin, admin.ModelAdmin):
+            pass
+
+        request = self.factory.get("/")
+        admin_instance = NoContentAdmin(Person, self.admin_site)
+
+        queryset = admin_instance.get_queryset(request)
+        self.assertEqual(queryset.model, Person)
+
+    def test_get_queryset_without_grouper_fk(self):
+        class NoFKAdmin(CustomGrouperAdminMixin, admin.ModelAdmin):
+            content_model = BlogPostContent
+
+        request = self.factory.get("/")
+        admin_instance = NoFKAdmin(Person, self.admin_site)
+
+        queryset = admin_instance.get_queryset(request)
+        self.assertEqual(queryset.model, Person)
+        self.assertEqual(list(queryset._prefetch_related_lookups), [])
+
+    def test_get_queryset_prefetches_latest_content(self):
+        class PersonContentAdmin(CustomGrouperAdminMixin, admin.ModelAdmin):
+            content_model = PersonContent
+
+        request = self.factory.get("/")
+        admin_instance = PersonContentAdmin(Person, self.admin_site)
+
+        queryset = admin_instance.get_queryset(request)
+        accessor_name = PersonContent._meta.get_field("person").remote_field.get_accessor_name()
+        lookups = list(queryset._prefetch_related_lookups)
+        has_prefetch = any(
+            getattr(lookup, "prefetch_through", None) == accessor_name or lookup == accessor_name for lookup in lookups
+        )
+        self.assertTrue(has_prefetch)
+
+    def test_breadcrumb_redir_falls_back_to_changelist(self):
+        request = self.factory.get("/")
+        config = apps.get_app_config("djangocms_custom_content").cms_config
+        previous = list(config.cms_toolbar_enabled_models)
+        config.cms_toolbar_enabled_models = []
+
+        response = self.person_admin.breadcrumb_redir(request, slug="1")
+
+        config.cms_toolbar_enabled_models = previous
+        info = f"{Person._meta.app_label}_{Person._meta.model_name}"
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, admin_reverse(f"{info}_changelist"))
+
+    def test_breadcrumb_redir_redirects_to_grouper_change(self):
+        class ContentAdmin(CustomGrouperAdminMixin, admin.ModelAdmin):
+            pass
+
+        request = self.factory.get("/")
+        admin_instance = ContentAdmin(PersonContent, self.admin_site)
+        config = apps.get_app_config("djangocms_custom_content").cms_config
+        previous = list(config.cms_toolbar_enabled_models)
+        config.cms_toolbar_enabled_models = [PersonContent]
+
+        response = admin_instance.breadcrumb_redir(request, slug="1")
+
+        config.cms_toolbar_enabled_models = previous
+        info = f"{Person._meta.app_label}_{Person._meta.model_name}"
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, admin_reverse(f"{info}_change", args=("1",)))
