@@ -2,6 +2,8 @@
 djangocms-custom-content
 ========================
 
+|PyPiVersion| |PyVersion| |DjVersion| |CmsVersion| |Coverage|
+
 Developer framework for integrating custom content models with django CMS.
 
 Description
@@ -106,3 +108,23 @@ License
 =======
 
 This project is licensed under the BSD-3-Clause License.
+
+
+.. |PyPiVersion| image:: https://img.shields.io/pypi/v/djangocms-custom-content.svg?style=flat-square
+    :target: https://pypi.python.org/pypi/djangocms-custom-content
+    :alt: Latest PyPI version
+
+.. |PyVersion| image:: https://img.shields.io/pypi/pyversions/djangocms-custom-content.svg?style=flat-square
+    :target: https://pypi.python.org/pypi/djangocms-custom-content
+    :alt: Python versions
+
+.. |DjVersion| image:: https://img.shields.io/pypi/frameworkversions/django/djangocms-custom-content.svg?style=flat-square
+    :target: https://pypi.python.org/pypi/djangocms-custom-content
+    :alt: Django versions
+
+.. |CmsVersion| image:: https://img.shields.io/pypi/frameworkversions/django-cms/djangocms-custom-content.svg?style=flat-square
+    :target: https://pypi.python.org/pypi/djangocms-custom-content
+    :alt: django CMS versions
+
+.. |Coverage| image:: https://codecov.io/gh/fsbraun/djangocms-custom-content/graph/badge.svg?token=GESjKzHSXl
+    :target: https://codecov.io/gh/fsbraun/djangocms-custom-content
