@@ -1,7 +1,10 @@
+from unittest import skipUnless
+
 import pytest
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import connection
+from django.http import Http404
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 
@@ -123,3 +126,29 @@ class ViewsTestCase(TestCase):
 
         # With select_related: 1 query for PersonContent + Person
         self.assertEqual(len(ctx), 1)
+
+    @skipUnless(VERSIONING, "Only relevant with versioning")
+    def test_detail_view_hides_unpublished_content(self):
+        """Test that CustomDetailView does not show unpublished (draft) content."""
+        # Create an unpublished person and content
+        unpublished_person = Person.objects.create()
+        unpublished_content = PersonContent.objects.with_user(self.superuser).create(
+            person=unpublished_person,
+            name="Draft Person",
+            role="Secret",
+            description="This is a draft",
+            slug="draft-person",
+        )
+
+        # Verify it exists in admin_manager (all content)
+        self.assertTrue(PersonContent.admin_manager.filter(pk=unpublished_content.pk).exists())
+
+        # Try to access via CustomDetailView - should raise Http404
+        view_class = custom_detail_view_factory(PersonContent)
+        view = view_class()
+        request = self.factory.get("/")
+        view.setup(request, pk=unpublished_content.pk)
+
+        # Should raise Http404 because content is not published
+        with self.assertRaises(Http404):
+            view.get_object()
