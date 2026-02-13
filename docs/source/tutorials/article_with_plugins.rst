@@ -1,5 +1,5 @@
-Article with CMS Plugins Tutorial
-==================================
+Article with APPhooks and CMS Plugins
+=====================================
 
 Build on the basic article model by adding CMS plugins and an app hook for frontend display.
 

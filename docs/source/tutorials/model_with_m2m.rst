@@ -1,5 +1,5 @@
-Model with M2M Relations Tutorial
-==================================
+Model with M2M Relations
+========================
 
 Learn how to create flexible many-to-many relationships between your content models.
 

@@ -1,5 +1,5 @@
-Installation Tutorial
-=====================
+Installation and Example
+========================
 
 Install djangocms-custom-content and create your first editable, versionable content model.
 
