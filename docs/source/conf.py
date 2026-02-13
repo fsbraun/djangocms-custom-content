@@ -31,7 +31,58 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx_copybutton",
     "sphinxcontrib.spelling",
+    "sphinx_design",
 ]
+
+# Autodoc configuration
+autodoc_default_options = {
+    "members": True,
+    "member-order": "bysource",
+    "special-members": "__init__",
+    "undoc-members": True,
+    "show-inheritance": True,
+}
+autodoc_typehints = "description"
+autodoc_preserve_defaults = True
+autodoc_mock_imports = [
+    "django",
+    "django.db",
+    "django.db.models",
+    "django.db.models.base",
+    "django.db.models.fields",
+    "django.db.models.fields.reverse_related",
+    "django.db.models.managers",
+    "django.contrib",
+    "django.contrib.admin",
+    "django.contrib.contenttypes",
+    "django.contrib.contenttypes.fields",
+    "django.contrib.contenttypes.models",
+    "django.utils",
+    "django.utils.translation",
+    "django.core.cache",
+    "cms",
+    "cms.api",
+    "cms.app_base",
+    "cms.models",
+    "cms.models.fields",
+    "cms.models.managers",
+    "cms.plugin_base",
+    "cms.plugin_pool",
+    "cms.toolbar",
+    "cms.toolbar.base",
+]
+
+
+def autodoc_skip_member(app, what, name, obj, skip, options):
+    """Skip Meta classes from autodoc."""
+    if name == "Meta":
+        return True
+    return skip
+
+
+def setup(app):
+    app.connect("autodoc-skip-member", autodoc_skip_member)
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]

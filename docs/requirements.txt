@@ -2,5 +2,7 @@ furo
 Sphinx
 sphinx-autobuild
 sphinx-copybutton
+sphinx-design
 sphinxcontrib-spelling
 pip-tools
+-e ..

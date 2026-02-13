@@ -134,6 +134,30 @@ class CustomContentConfig(CMSAppConfig):
         return None
 
     def register_m2m_relation(self, model: type[models.Model]):
+        """
+        Register many-to-many relations defined in the model's CMSConfig.
+
+        This method processes the ``m2m_relations`` attribute from a model's CMSConfig
+        and sets up reverse accessors on the target models. Each relation defined as:
+
+            m2m_relations = [("accessor_name", "app_label.ModelName")]
+
+        Will add an ``accessor_name`` property to the target model that returns a
+        GenericM2MManager for managing the relationship.
+
+        The target model will be able to access linked objects via:
+            target_instance.accessor_name.all()
+            target_instance.accessor_name.add(obj)
+            target_instance.accessor_name.remove(obj)
+            target_instance.accessor_name.clear()
+
+        Args:
+            model: The content model to register m2m relations for
+
+        Raises:
+            ImproperlyConfigured: If m2m_relations is defined but the relation model
+                                  (created via custom_relation_factory) is not found
+        """
         from djangocms_custom_content.models import GenericM2MDescriptor
 
         cms_config = getattr(model, "CMSConfig", None)
