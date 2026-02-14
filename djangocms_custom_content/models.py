@@ -1,7 +1,7 @@
 from collections.abc import Callable
 
 from cms.models.fields import PlaceholderRelationField
-from cms.models.managers import WithUserMixin
+from cms.models.managers import ContentAdminManager, WithUserMixin
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -126,7 +126,7 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
         if self._is_admin_cache:
             self._is_admin_cache = False
             self._content_cache = None
-        return self._get_content(language or get_language(), self._content_set)
+        return self._get_content(language or get_language(), self._content_set.all())
 
     def get_admin_content(self, language: str | None = None) -> models.Model | None:
         """
@@ -202,6 +202,8 @@ class AbstractCustomContent(CustomContentMixin, models.Model):
     """
 
     objects = CustomContentManager()
+    admin_manager = ContentAdminManager()
+
     placeholders = PlaceholderRelationField()
 
     template_name_suffix = "_detail"
