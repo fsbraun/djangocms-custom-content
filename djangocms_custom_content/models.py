@@ -447,13 +447,13 @@ class GenericM2MManager:
 
     def _related_queryset(self):
         """Return a queryset of the actual related objects (not relations)."""
-        related_model = self.through_model._meta.get_field("instance").related_model
+        related_model = self.through_model._meta.get_field(self.related_field_name).related_model
         # Use admin_manager if available (for versioned content models), otherwise use objects
         manager = getattr(related_model, "admin_manager", None) or related_model.objects
         return manager.filter(
             pk__in=self.through_model.objects.filter(
                 content_type=self.content_type, object_id=self.instance.pk
-            ).values_list(self.related_field_name, flat=False)
+            ).values_list(self.related_field_name, flat=True)
         )
 
     def filter(self, *args, **kwargs):
