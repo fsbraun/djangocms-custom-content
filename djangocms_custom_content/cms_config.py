@@ -140,9 +140,9 @@ class CustomContentConfig(CMSAppConfig):
         a dummy manager so attribute access keeps working without raising.
         """
         from djangocms_custom_content.models import (
+            _AUTO_REVERSE,
             FK_SIDE,
             GFK_SIDE,
-            _AUTO_REVERSE,
             _CustomM2MDescriptor,
             _DummyM2MDescriptor,
             _normalize_m2m_decl,

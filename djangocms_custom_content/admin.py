@@ -5,7 +5,6 @@ from django.urls import path
 
 from djangocms_custom_content.views import CustomM2MAutocompleteView
 
-
 M2M_AUTOCOMPLETE_URL_NAME = "djangocms_custom_content_m2m_autocomplete"
 
 
