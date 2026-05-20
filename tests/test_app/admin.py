@@ -2,7 +2,16 @@
 
 from django.contrib import admin
 
-from .models import RelTopic, SampleGrouper, SampleGrouperContent, StandaloneContent
+from djangocms_custom_content.admin import CustomM2MAdminMixin
+
+from .models import (
+    OtherTarget,
+    RelTopic,
+    SampleGrouper,
+    SampleGrouperContent,
+    StandaloneContent,
+    TagTarget,
+)
 
 
 @admin.register(SampleGrouper)
@@ -21,11 +30,26 @@ class SampleGrouperContentAdmin(admin.ModelAdmin):
     search_fields = ("title",)
 
 
+@admin.register(TagTarget)
+class TagTargetAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)
+
+
+@admin.register(OtherTarget)
+class OtherTargetAdmin(admin.ModelAdmin):
+    list_display = ("label",)
+    search_fields = ("label",)
+
+
 @admin.register(RelTopic)
-class RelTopicAdmin(admin.ModelAdmin):
+class RelTopicAdmin(CustomM2MAdminMixin, admin.ModelAdmin):
     list_display = ("pk",)
+    m2m_sortable_fields = ["tags"]
+    m2m_fields = ["featured", "hidden"]
 
 
 @admin.register(StandaloneContent)
-class StandaloneContentAdmin(admin.ModelAdmin):
+class StandaloneContentAdmin(CustomM2MAdminMixin, admin.ModelAdmin):
     list_display = ("title",)
+    m2m_sortable_fields = ["targets"]

@@ -133,6 +133,27 @@ that returns empty results and silently accepts ``add()``/``remove()`` calls.
 This lets a content model declare optional relations without crashing when
 the optional app isn't enabled.
 
+Admin integration
+-----------------
+
+To surface an m2m accessor as an autocomplete multi-select in the grouper
+admin, mix in :class:`~djangocms_custom_content.admin.CustomM2MAdminMixin`
+and list the accessor names you want exposed:
+
+.. code-block:: python
+
+    from djangocms_custom_content.admin import CustomM2MAdminMixin
+
+    class BlogPostAdmin(CustomM2MAdminMixin, GrouperModelAdmin):
+        m2m_fields = ["categories"]              # plain autocomplete
+        m2m_sortable_fields = ["authors"]        # autocomplete + drag-to-reorder
+
+A name in ``m2m_sortable_fields`` ships Sortable.js and persists the chosen
+order via the through-table's ``order`` column. A name in ``m2m_fields`` just
+adds/removes relations without caring about order. Each name must already be
+declared in some content model's ``CMSConfig.m2m`` and the target model must
+be registered with the admin site and define ``search_fields``.
+
 In templates
 ------------
 

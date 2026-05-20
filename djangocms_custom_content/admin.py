@@ -5,6 +5,38 @@ from django.db.models import Prefetch
 from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import path
 
+from djangocms_custom_content.views import CustomM2MAutocompleteView
+
+
+M2M_AUTOCOMPLETE_URL_NAME = "djangocms_custom_content_m2m_autocomplete"
+
+
+def register_m2m_autocomplete_url(admin_site):
+    """Install the m2m autocomplete view on ``admin_site``.
+
+    Wraps ``admin_site.get_urls`` so the same endpoint is exposed on whichever
+    ``AdminSite`` instance is in use (default ``admin.site`` by default, but
+    projects may register their own).
+    """
+    if getattr(admin_site, "_djangocms_custom_content_m2m_url_registered", False):
+        return
+    admin_site._djangocms_custom_content_m2m_url_registered = True
+
+    original_get_urls = admin_site.get_urls
+
+    def get_urls():
+        urls = original_get_urls()
+        extra = [
+            path(
+                "djangocms_custom_content/m2m-autocomplete/",
+                admin_site.admin_view(CustomM2MAutocompleteView.as_view()),
+                name=M2M_AUTOCOMPLETE_URL_NAME,
+            ),
+        ]
+        return extra + urls
+
+    admin_site.get_urls = get_urls
+
 
 class CustomGrouperAdminMixin:
     """Admin mixin to optimize queries and redirect content endpoints.
@@ -69,3 +101,101 @@ class CustomGrouperAdminMixin:
                 info = f"{grouper_model._meta.app_label}_{grouper_model._meta.model_name}"
                 return HttpResponseRedirect(admin_reverse(f"{info}_change", args=(id,)))
         return HttpResponseRedirect(admin_reverse(f"{info}_changelist"))
+
+
+class _CustomM2MFormMixin:
+    """Mixin baked onto admin forms to populate m2m initial values from the instance."""
+
+    _custom_m2m_field_names: list[str] = []
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, "instance", None)
+        if instance is not None and instance.pk:
+            for name in self._custom_m2m_field_names:
+                if name in self.fields:
+                    self.fields[name].initial = list(getattr(instance, name).all())
+
+
+class CustomM2MAdminMixin:
+    """Surface ``CMSConfig.m2m`` accessors as autocomplete fields in admin.
+
+    Two opt-in lists:
+
+    * ``m2m_fields`` — plain autocomplete multi-select (no drag-to-reorder).
+    * ``m2m_sortable_fields`` — autocomplete + Sortable.js drag-to-reorder;
+      the chosen order is persisted in the through-table's ``order`` column.
+
+    A field name may appear in only one of the two lists. Example::
+
+        class BlogPostAdmin(CustomM2MAdminMixin, GrouperModelAdmin):
+            m2m_fields = ["categories"]
+            m2m_sortable_fields = ["authors"]
+
+    For each declared accessor the mixin:
+
+    * Locates the matching ``CMSConfig.m2m`` descriptor on ``self.model``.
+    * Declares a ``CustomM2MField`` on the admin form class so Django's
+      ``modelform_factory`` accepts the field name in its ``fields`` list.
+    * Populates the field's initial value from the saved relations on form
+      instantiation (in persisted order for sortable fields).
+    * On save, calls ``instance.<accessor>.set(values)`` so the chosen order
+      is persisted in the through-table's ``order`` column.
+
+    The target model must be registered with the admin site and define
+    ``search_fields`` for the autocomplete endpoint to return results.
+    """
+
+    m2m_fields: list[str] = []
+    m2m_sortable_fields: list[str] = []
+
+    def _custom_m2m_descriptors(self):
+        """Return ``{accessor_name: (target_model, sortable)}`` for declared accessors."""
+        from djangocms_custom_content.models import _CustomM2MDescriptor
+
+        result = {}
+        for name in self.m2m_fields:
+            descriptor = getattr(self.model, name, None)
+            if isinstance(descriptor, _CustomM2MDescriptor):
+                result[name] = (descriptor.target_model, False)
+        for name in self.m2m_sortable_fields:
+            descriptor = getattr(self.model, name, None)
+            if isinstance(descriptor, _CustomM2MDescriptor):
+                result[name] = (descriptor.target_model, True)
+        return result
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        from django import forms as django_forms
+
+        from djangocms_custom_content.forms import CustomM2MField
+
+        descriptors = self._custom_m2m_descriptors()
+        if descriptors:
+            admin_site = self.admin_site
+            extras = {
+                name: CustomM2MField(
+                    target_model=target_model,
+                    admin_site=admin_site,
+                    sortable=sortable,
+                    label=name.replace("_", " ").capitalize(),
+                )
+                for name, (target_model, sortable) in descriptors.items()
+            }
+            base_form = kwargs.pop("form", None) or getattr(self, "form", django_forms.ModelForm)
+            form_with_extras = type(
+                base_form.__name__,
+                (_CustomM2MFormMixin, base_form),
+                {
+                    **extras,
+                    "_custom_m2m_field_names": list(descriptors.keys()),
+                },
+            )
+            kwargs["form"] = form_with_extras
+
+        return super().get_form(request, obj=obj, change=change, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        for name in self._custom_m2m_descriptors():
+            if name in form.cleaned_data:
+                getattr(obj, name).set(form.cleaned_data[name])

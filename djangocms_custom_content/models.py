@@ -235,9 +235,6 @@ class AbstractCustomRelation(models.Model):
       pointing to the relation's target.
     """
 
-    class Meta:
-        abstract = True
-
     content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
@@ -248,8 +245,13 @@ class AbstractCustomRelation(models.Model):
     )
     content_object = GenericForeignKey("content_type", "object_id")
     relation_name = models.CharField(_("relation name"), max_length=100)
+    order = models.PositiveIntegerField(_("order"), default=0)
 
     instance = None  # Concrete subclasses replace this with a ForeignKey
+
+    class Meta:
+        abstract = True
+        ordering = ("order", "pk")
 
     def __str__(self) -> str:
         return f"{self.instance} -[{self.relation_name}]-> {self.content_object}"
@@ -298,34 +300,86 @@ class _CustomM2MManager:
         return getattr(self.target_model, "admin_manager", None) or self.target_model._default_manager
 
     def all(self):
-        return self._target_manager().filter(
-            pk__in=self._through_qs().values_list(self._target_pk_field(), flat=True)
+        """Return a queryset of related target objects, ordered by the through-table's ``order``."""
+        from django.db.models import OuterRef, Subquery
+
+        target_pk_field = self._target_pk_field()
+        through_qs = self._through_qs()
+        order_lookup = through_qs.filter(**{target_pk_field: OuterRef("pk")}).values("order")[:1]
+        return (
+            self._target_manager()
+            .filter(pk__in=through_qs.values_list(target_pk_field, flat=True))
+            .annotate(_m2m_order=Subquery(order_lookup))
+            .order_by("_m2m_order")
         )
 
     def filter(self, *args, **kwargs):
         return self.all().filter(*args, **kwargs)
 
     def count(self):
-        return self.all().count()
+        return self._through_qs().count()
 
     def exists(self):
-        return self.all().exists()
+        return self._through_qs().exists()
+
+    def _next_order(self):
+        last = self._through_qs().order_by("-order").values_list("order", flat=True).first()
+        return (last or 0) + 1
 
     def add(self, *objs):
+        order = self._next_order()
         for obj in objs:
             if self.side == FK_SIDE:
-                self.through_model.objects.get_or_create(
+                _row, created = self.through_model.objects.get_or_create(
                     instance=self.instance,
                     content_type=ContentType.objects.get_for_model(self.target_model),
                     object_id=obj.pk,
                     relation_name=self.relation_name,
+                    defaults={"order": order},
                 )
             else:
-                self.through_model.objects.get_or_create(
+                _row, created = self.through_model.objects.get_or_create(
                     instance=obj,
                     content_type=ContentType.objects.get_for_model(type(self.instance)),
                     object_id=self.instance.pk,
                     relation_name=self.relation_name,
+                    defaults={"order": order},
+                )
+            if created:
+                order += 1
+
+    def set(self, objs):
+        """Replace the current set of relations with ``objs`` in the given order.
+
+        Existing rows for relations not in ``objs`` are deleted; existing rows
+        for relations that remain have their ``order`` updated to match the
+        position in ``objs``.
+        """
+        objs = list(objs)
+        keep_pks = [o.pk for o in objs]
+        # Delete rows for relations no longer present
+        if self.side == FK_SIDE:
+            self._through_qs().exclude(object_id__in=keep_pks).delete()
+        else:
+            self._through_qs().exclude(instance_id__in=keep_pks).delete()
+
+        # Upsert remaining rows with the new ordering
+        for pos, obj in enumerate(objs):
+            if self.side == FK_SIDE:
+                self.through_model.objects.update_or_create(
+                    instance=self.instance,
+                    content_type=ContentType.objects.get_for_model(self.target_model),
+                    object_id=obj.pk,
+                    relation_name=self.relation_name,
+                    defaults={"order": pos},
+                )
+            else:
+                self.through_model.objects.update_or_create(
+                    instance=obj,
+                    content_type=ContentType.objects.get_for_model(type(self.instance)),
+                    object_id=self.instance.pk,
+                    relation_name=self.relation_name,
+                    defaults={"order": pos},
                 )
 
     def remove(self, *objs):
