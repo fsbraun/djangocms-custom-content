@@ -1,7 +1,7 @@
 Using the contrib.categories module
 ===================================
 
-Flexible category system for organizing content using the ``relate_to`` configuration.
+Flexible category system for organizing content.
 
 Installation
 -----------
@@ -10,6 +10,7 @@ Installation
 
     INSTALLED_APPS = [
         "djangocms_custom_content",
+        "djangocms_custom_content.contrib.blog",
         "djangocms_custom_content.contrib.categories",
     ]
 
@@ -22,14 +23,21 @@ Models
 
 **FlatCategory** - A simple category model (inherits from ``AbstractCustomContent``)
 
-Fields: ``title``, ``slug``, ``is_featured``
+Fields: ``title``, ``slug``, ``is_featured``.
 
-The ``FlatCategory`` model uses the ``relate_to`` configuration to automatically add a ``categories`` accessor to ``BlogPost``:
+The relation between ``BlogPostContent`` and ``FlatCategory`` is declared
+**on the blog side** via ``CMSConfig.m2m``:
 
 .. code-block:: python
 
-    class CMSConfig:
-        relate_to = [("categories", "djangocms_custom_content_blog.BlogPost")]
+    class BlogPostContent(AbstractCustomContent):
+        class CMSConfig:
+            m2m = [
+                ("categories", "djangocms_custom_content_categories.FlatCategory"),
+            ]
+
+That single declaration installs ``BlogPost.categories`` (forward, on the
+grouper) and the auto-named reverse ``FlatCategory.blogpost_set``.
 
 Usage
 -----
@@ -53,18 +61,15 @@ Link categories to blog posts:
     from djangocms_custom_content.contrib.blog.models import BlogPost
 
     blog_post = BlogPost.objects.first()
-    
-    # Add a category
+
+    # Forward — manage categories from the blog post side
     blog_post.categories.add(category)
-    
-    # Get all categories
-    categories = blog_post.categories.all()
-    
-    # Remove a category
+    list(blog_post.categories.all())
     blog_post.categories.remove(category)
-    
-    # Clear all categories
     blog_post.categories.clear()
+
+    # Reverse — list blog posts attached to a category
+    list(category.blogpost_set.all())
 
 Plugins
 -------
@@ -98,5 +103,5 @@ In Templates
 See Also
 --------
 
-- :doc:`../how-to/m2m_relations` - Learn about ``relate_to`` and ``invite_m2m_relations``
+- :doc:`../how-to/m2m_relations` - The full ``CMSConfig.m2m`` reference
 - :doc:`../explanation/relationships` - How M2M relations work

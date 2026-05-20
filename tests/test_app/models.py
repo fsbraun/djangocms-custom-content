@@ -1,16 +1,11 @@
 # Test models
-from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
-from djangocms_custom_content.models import (
-    AbstractCustomContent,
-    AbstractCustomGrouper,
-    AbstractCustomRelation,
-)
+from djangocms_custom_content.models import AbstractCustomContent, AbstractCustomGrouper
 
 
-class Author(models.Model):
-    """Simple model to use as a grouper for testing custom relations."""
+class TagTarget(models.Model):
+    """Plain Django model used as the target of m2m relations in tests."""
 
     name = models.CharField(max_length=100)
 
@@ -21,50 +16,64 @@ class Author(models.Model):
         return self.name
 
 
-class Book(models.Model):
-    """Simple model to use as content for testing generic relations."""
+class OtherTarget(models.Model):
+    """Second plain target, used to verify multiple relations to the same model class."""
 
-    title = models.CharField(max_length=200)
-    author = models.CharField(max_length=100)
+    label = models.CharField(max_length=100)
 
     class Meta:
         app_label = "test_app"
+
+    def __str__(self):
+        return self.label
+
+
+class RelTopic(AbstractCustomGrouper):
+    """Grouper for testing CMSConfig.m2m on its content model."""
+
+    class Meta:
+        app_label = "test_app"
+
+    def __str__(self):
+        return f"RelTopic {self.pk}"
+
+
+class RelTopicContent(AbstractCustomContent):
+    """Content model declaring m2m relations for tests."""
+
+    topic = models.ForeignKey(RelTopic, on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    language = models.CharField(max_length=5, default="en")
+
+    class Meta:
+        app_label = "test_app"
+
+    class CMSConfig:
+        m2m = [
+            ("tags", "test_app.TagTarget"),                       # auto reverse: reltopic_set
+            ("featured", "test_app.TagTarget", "featured_in"),    # explicit reverse name
+            ("hidden", "test_app.OtherTarget", None),             # no reverse accessor
+        ]
 
     def __str__(self):
         return self.title
 
 
-class Article(models.Model):
-    """Another content model for testing."""
+class StandaloneContent(AbstractCustomContent):
+    """Content model with no grouper — relation FK should point to itself."""
 
-    headline = models.CharField(max_length=200)
+    title = models.CharField(max_length=200)
 
     class Meta:
         app_label = "test_app"
+
+    class CMSConfig:
+        m2m = [
+            ("targets", "test_app.TagTarget"),
+        ]
 
     def __str__(self):
-        return self.headline
-
-
-class AuthorRelation(AbstractCustomRelation):
-    """Relation model for testing GenericM2M relations."""
-
-    instance = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="+")
-
-    class Meta:
-        app_label = "test_app"
-
-
-class BookRelation(AbstractCustomRelation):
-    """Relation model for testing GenericM2M relations with Book."""
-
-    instance = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="+")
-
-    class Meta:
-        app_label = "test_app"
-
-    def __str__(self):
-        return self.headline
+        return self.title
 
 
 class SampleGrouper(AbstractCustomGrouper):

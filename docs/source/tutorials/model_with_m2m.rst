@@ -1,18 +1,19 @@
 Model with M2M Relations
 ========================
 
-Learn how to create flexible many-to-many relationships between your content models.
+Learn how to add many-to-many relationships between your content models using
+the declarative ``CMSConfig.m2m`` API.
 
 This tutorial builds on the :doc:`article_with_plugins` tutorial.
 
 Overview
 --------
 
-We'll add authors to our articles using the ``invite_m2m_relations`` feature:
+We'll add authors to articles in a single line of configuration:
 
-- Create a ``Person`` model to represent authors
-- Link ``Person`` objects to articles using generic M2M relations
-- Display authors on article pages
+- Create a ``Person`` grouper to represent authors
+- Declare an ``authors`` relation on ``ArticleContent``
+- Display authors on article pages, and articles on author pages
 
 Step 1: Create the Person Model
 --------------------------------
@@ -25,7 +26,6 @@ Add to ``my_content/models.py``:
     from djangocms_custom_content.models import (
         AbstractCustomGrouper,
         AbstractCustomContent,
-        custom_relation_factory,
     )
 
     # Existing Article and ArticleContent models...
@@ -55,14 +55,13 @@ Add to ``my_content/models.py``:
         def __str__(self):
             return self.full_name
 
-    # THIS IS REQUIRED for invite_m2m_relations to work
-    # Note: Create relation factory for the Grouper (Person), not Content model
-    PersonRelation = custom_relation_factory(Person)
+No relation-table boilerplate is needed: the through-model is generated for
+you in step 2 by declaring the relation on ``ArticleContent``.
 
-Step 2: Configure ArticleContent for M2M
-------------------------------------------
+Step 2: Declare the Relation on ArticleContent
+----------------------------------------------
 
-Update the ``ArticleContent`` model in ``my_content/models.py`` to point to Person:
+Update the ``ArticleContent`` model in ``my_content/models.py``:
 
 .. code-block:: python
 
@@ -74,17 +73,21 @@ Update the ``ArticleContent`` model in ``my_content/models.py`` to point to Pers
         body = models.TextField()
 
         class CMSConfig:
-            editable = True
-            versionable = True
+            enable_frontend_editing = True
+            enable_versioning = True
             apphook = True
-            # Request authors from the Person model
-            invite_m2m_relations = [("authors", "my_content.Person")]
+            m2m = [
+                ("authors", "my_content.Person"),
+            ]
 
         def __str__(self):
             return self.title
 
-        def __str__(self):
-            return self.title
+That's all — declaring ``m2m`` automatically:
+
+* creates ``ArticleContentRelation`` in the ``my_content`` app
+* installs ``Article.authors`` (forward) on the grouper
+* installs ``Person.article_set`` (reverse, auto-named) on the target grouper
 
 Step 3: Register Person with Admin
 -----------------------------------
@@ -103,11 +106,12 @@ Add to ``my_content/admin.py``:
     class PersonContentAdmin(admin.ModelAdmin):
         list_display = ("full_name", "email")
 
-Step 4: Update Article Detail Template with Authors
-----------------------------------------------------
+Step 4: Display Authors on the Article Page
+-------------------------------------------
 
-Update ``my_content/templates/my_content/article_detail.html`` to display authors.
-The generic detail view automatically provides the article object and you can access authors via the ``invite_m2m_relations`` accessor:
+Update ``my_content/templates/my_content/article_detail.html``. The forward
+accessor lives on the grouper (``Article``), which the detail view exposes as
+``article``:
 
 .. code-block:: django
 
@@ -125,20 +129,19 @@ The generic detail view automatically provides the article object and you can ac
                     <ul class="author-list">
                         {% for author in article.authors.all %}
                             <li class="author">
-                                {% if author.avatar %}
-                                    <img src="{{ author.avatar.url }}"
-                                         alt="{{ author.full_name }}"
-                                         class="author-avatar">
-                                {% endif %}
-                                <div class="author-info">
-                                    <strong>{{ author.full_name }}</strong>
-                                    {% if author.bio %}
-                                        <p class="bio">{{ author.bio }}</p>
+                                {% with author.get_admin_content as profile %}
+                                    {% if profile.avatar %}
+                                        <img src="{{ profile.avatar.url }}"
+                                             alt="{{ profile.full_name }}"
+                                             class="author-avatar">
                                     {% endif %}
-                                    {% if author.email %}
-                                        <p><a href="mailto:{{ author.email }}">{{ author.email }}</a></p>
-                                    {% endif %}
-                                </div>
+                                    <div class="author-info">
+                                        <strong>{{ profile.full_name }}</strong>
+                                        {% if profile.bio %}
+                                            <p class="bio">{{ profile.bio }}</p>
+                                        {% endif %}
+                                    </div>
+                                {% endwith %}
                             </li>
                         {% endfor %}
                     </ul>
@@ -160,6 +163,9 @@ Step 5: Create Migrations
     python manage.py makemigrations my_content
     python manage.py migrate my_content
 
+The generated migration creates the ``Person``/``PersonContent`` models *and*
+the auto-generated ``ArticleContentRelation`` through-table in one go.
+
 Step 6: Link Authors to Articles
 ---------------------------------
 
@@ -167,59 +173,66 @@ Via Django shell:
 
 .. code-block:: python
 
-    from my_content.models import ArticleContent, Person
+    from my_content.models import Article, Person
 
-    article = ArticleContent.objects.first()
+    article = Article.objects.first()
     person = Person.objects.first()
 
-    # Add an author to the article
+    # Forward — add an author to the article
     article.authors.add(person)
 
     # Get all authors of an article
-    all_authors = article.authors.all()
+    list(article.authors.all())
 
-    # Remove an author
+    # Reverse — get all articles by a person (auto-named accessor)
+    list(person.article_set.all())
+
+    # Remove / clear
     article.authors.remove(person)
-
-    # Clear all authors
     article.authors.clear()
 
-Via Django admin:
-
-1. Edit an ``ArticleContent`` object
-2. Use the ``authors`` accessor to add/remove Person objects
-3. Save
-
 Key Concepts
------------
+------------
 
-**invite_m2m_relations**
+**CMSConfig.m2m**
 
-The ``invite_m2m_relations`` configuration tells ArticleContent:
-
-- "I want to link to Person objects"
-- "Please add an ``authors`` accessor to my instances"
-- "Use a generic through model to handle the relationship"
-
-This creates a bidirectional relationship:
+A single list entry declares both directions of the relation:
 
 .. code-block:: python
 
-    # From ArticleContent side:
-    article.authors.all()  # Get authors of this article
+    m2m = [("authors", "my_content.Person")]
 
-    # There's no direct reverse accessor on Person
-    # (it doesn't know about articles)
+- Forward accessor ``authors`` installed on the declarer's grouper
+  (``Article``).
+- Reverse accessor ``article_set`` installed on the target grouper
+  (``Person``) — derived from the owner's lowercased model name.
 
-**Generic M2M Benefits**
+**Auto-generated through-model**
 
-- One Person can be linked to many ArticleContent instances
-- The same Person model can be linked to other content types without modification
-- The through model (PersonRelation) is shared across all relations
+The framework creates ``ArticleContentRelation`` for you. It's a normal Django
+model, picked up by ``makemigrations``, with a single ``relation_name`` column
+that lets multiple ``m2m`` entries share the same table.
+
+**Language-independent by default**
+
+Because the through-model's FK targets the grouper (not the content), authors
+attached to one language version are visible from all language versions.
+
+**Custom reverse names**
+
+Use the 3-tuple form to override the reverse name, or pass ``None`` to
+suppress the reverse accessor:
+
+.. code-block:: python
+
+    m2m = [
+        ("authors", "my_content.Person", "wrote"),     # person.wrote
+        ("reviewers", "my_content.Person", None),      # no reverse on Person
+    ]
 
 Next Steps
 ----------
 
-- Learn more about :doc:`../how-to/m2m_relations` and the difference between ``relate_to`` and ``invite_m2m_relations``
-- Explore :doc:`../explanation/relationships` to understand how generic M2M relations work under the hood
-- Check :doc:`../reference/index` for complete API reference
+- Read :doc:`../how-to/m2m_relations` for the full ``m2m`` reference
+- Explore :doc:`../explanation/relationships` for the design rationale
+- Check :doc:`../reference/index` for the complete API reference

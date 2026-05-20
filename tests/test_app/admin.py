@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from .models import SampleGrouper, SampleGrouperContent
+from .models import RelTopic, SampleGrouper, SampleGrouperContent, StandaloneContent
 
 
 @admin.register(SampleGrouper)
@@ -19,3 +19,13 @@ class SampleGrouperContentAdmin(admin.ModelAdmin):
     list_display = ("title", "language", "grouper")
     list_filter = ("language",)
     search_fields = ("title",)
+
+
+@admin.register(RelTopic)
+class RelTopicAdmin(admin.ModelAdmin):
+    list_display = ("pk",)
+
+
+@admin.register(StandaloneContent)
+class StandaloneContentAdmin(admin.ModelAdmin):
+    list_display = ("title",)

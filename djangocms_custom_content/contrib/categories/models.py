@@ -2,7 +2,7 @@ from cms.models import CMSPlugin
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from djangocms_custom_content.models import AbstractCustomContent, custom_relation_factory
+from djangocms_custom_content.models import AbstractCustomContent
 
 
 class FlatCategory(AbstractCustomContent):
@@ -15,9 +15,6 @@ class FlatCategory(AbstractCustomContent):
         verbose_name_plural = _("Categories")
         ordering = ("title",)
 
-    class CMSConfig:
-        relate_to = [("categories", "djangocms_custom_content_blog.BlogPost")]
-
     def __str__(self):
         return self.title
 
@@ -28,6 +25,3 @@ class FlatCategoryList(CMSPlugin):
 
     class Meta:
         verbose_name = _("Category list")
-
-
-FlatCategoryRelation = custom_relation_factory(FlatCategory)

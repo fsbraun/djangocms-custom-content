@@ -1,12 +1,12 @@
-from collections.abc import Callable
-
 from cms.models.fields import PlaceholderRelationField
 from cms.models.managers import ContentAdminManager, WithUserMixin
+from django.apps import apps
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models.base import ModelBase
 from django.db.models.fields.reverse_related import ForeignObjectRel
+from django.db.models.signals import class_prepared
 from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 
@@ -185,20 +185,21 @@ class AbstractCustomContent(CustomContentMixin, models.Model):
     Inherit from this model in your project to quickly add placeholder support
     to your custom content types.
 
-    To define generic many-to-many relationships with other models, create a
-    CMSConfig class with the ``invite_m2m_relations`` attribute:
+    Many-to-many relationships to other models are declared via ``CMSConfig.m2m``::
 
-        class MyContentModel(AbstractCustomContent):
-            # ... fields ...
-
+        class BlogPostContent(AbstractCustomContent):
             class CMSConfig:
-                invite_m2m_relations = [("related_set", "app_label.RelatedModel")]
-                relate_to = [()"my_set", "cms.Page")]
+                m2m = [
+                    ("authors", "people.Person"),                 # auto-reverse: blogpost_set
+                    ("tags", "tags.Tag", "blog_posts"),           # explicit reverse name
+                    ("featured", "promo.Promo", None),            # no reverse accessor
+                ]
 
-        # Create the relation model (required):
-        MyContentRelation = custom_relation_factory(MyContentModel)
-
-    See the documentation for more details on M2M relations (relate_to and invite_m2m_relations).
+    For each declaration the framework creates a single through-model named
+    ``{ContentModelName}Relation`` in the declaring model's app, with an FK to
+    the model's grouper (or to the content model itself if there is no grouper).
+    The forward accessor is installed on that grouper/content model, and a
+    reverse accessor is installed on the target unless explicitly disabled.
     """
 
     objects = CustomContentManager()
@@ -222,45 +223,21 @@ class AbstractCustomContent(CustomContentMixin, models.Model):
 
 class AbstractCustomRelation(models.Model):
     """
-    Abstract base model for storing generic many-to-many relations.
+    Abstract base for the through-model used by custom m2m relations.
 
-    This model implements a generic foreign key pattern, allowing your content
-    models to be related to any Django model without explicitly defining foreign keys.
+    Users do not subclass this directly; the framework generates a concrete
+    subclass automatically from each ``CMSConfig.m2m`` declaration. The
+    generated class has:
 
-    The relation is stored using Django's :class:`~django.contrib.contenttypes.models.ContentType`
-    framework, which enables flexible relationships to any model.
-
-    Useful for:
-
-    - Creating flexible M2M relationships to multiple model types
-    - Avoiding explicit ForeignKey definitions when relations are dynamic
-    - Implementing patterns like "related items" or "linked content"
-
-    Attributes:
-        instance: ForeignKey to the content model (set via :func:`custom_relation_factory`)
-        content_type: ForeignKey to ContentType identifying the related model
-        object_id: ID of the related object
-        content_object: GenericForeignKey providing access to the actual related object
-
-    Example::
-
-        # This is created automatically via custom_relation_factory:
-        class PersonRelation(AbstractCustomRelation):
-            instance = ForeignKey(PersonContent, on_delete=CASCADE)
-
-        # Use via the descriptor on related models:
-        blog_post = BlogPost.objects.first()
-        blog_post.authors.all()  # Returns all related PersonContent objects
-
-    See Also:
-        :func:`custom_relation_factory` - Factory to create relation models
-        :class:`GenericM2MManager` - Manager providing the relation interface
+    * an ``instance`` ForeignKey pointing to the declarer (its grouper, or the
+      content model itself if it has no grouper);
+    * ``content_type`` + ``object_id`` (and the ``content_object`` GFK)
+      pointing to the relation's target.
     """
 
     class Meta:
         abstract = True
 
-    # Generic foreign key to any model
     content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
@@ -270,190 +247,59 @@ class AbstractCustomRelation(models.Model):
         _("object id"),
     )
     content_object = GenericForeignKey("content_type", "object_id")
+    relation_name = models.CharField(_("relation name"), max_length=100)
 
-    instance = None  # This will be set to the related grouper instance when the relation is accessed
+    instance = None  # Concrete subclasses replace this with a ForeignKey
 
     def __str__(self) -> str:
-        return f"{self.instance} -> {self.content_object}"
+        return f"{self.instance} -[{self.relation_name}]-> {self.content_object}"
 
 
-class _InverseRelationManager:
-    """
-    Internal manager for accessing inverse relations via descriptors.
-
-    This class is used internally by :class:`InverseRelationDescriptor` to provide
-    a manager interface for accessing related objects. It handles getting, adding,
-    and removing relations through the relation model.
-
-    This should not be instantiated directly; it is created automatically by
-    descriptors.
-
-    Args:
-        ``instance``: The model instance this manager is bound to
-        ``relation_model``: The relation model (inherits from :class:`AbstractCustomRelation`)
-    """
-
-    def __init__(self, instance, relation_model):
-        self.instance = instance
-        self.relation_model = relation_model
-
-    def add(self, obj):
-        """Add a related object to this instance's relations.
-
-        Args:
-            ``obj``: The object to relate to this instance
-        """
-        ct = ContentType.objects.get_for_model(obj)
-        self.relation_model.objects.get_or_create(
-            instance=self.instance,
-            content_type=ct,
-            object_id=obj.pk,
-        )
-
-    def remove(self, obj):
-        """Remove a related object from this instance's relations.
-
-        Args:
-            ``obj``: The object to remove from this instance's relations
-        """
-        ct = ContentType.objects.get_for_model(obj)
-        self.relation_model.objects.filter(
-            instance=self.instance,
-            content_type=ct,
-            object_id=obj.pk,
-        ).delete()
-
-    def all(self):
-        """Return all related objects for this instance.
-
-        Returns:
-            list: A list of all related objects
-        """
-        return [
-            rel.content_object
-            for rel in self.relation_model.objects.filter(instance=self.instance).select_related("content_type")
-        ]
-
-    def filter(self, *args, **kwargs):
-        return self.all().filter(*args, **kwargs)
-
-    def count(self):
-        return self.all().count()
-
-    def exists(self):
-        return self.all().exists()
+FK_SIDE = "fk"
+GFK_SIDE = "gfk"
 
 
-class InverseRelationDescriptor:
-    """
-    Descriptor providing access to inverse generic M2M relations.
+class _CustomM2MManager:
+    """Manager returned by :class:`_CustomM2MDescriptor`.
 
-    This descriptor is assigned to models to provide a manager interface for
-    accessing models that are related via :class:`AbstractCustomRelation`.
+    Handles both directions of a custom m2m relation:
 
-    The descriptor returns itself when accessed on the class, and returns a
-    :class:`_InverseRelationManager` instance when accessed on a model instance.
+    * ``side=FK_SIDE`` — the instance is the declarer (FK column of the
+      through-model). Used by the forward accessor on the owner.
+    * ``side=GFK_SIDE`` — the instance is the target (GFK column). Used by the
+      reverse accessor.
 
-    Args:
-        ``relation_model``: The relation model (inherits from :class:`AbstractCustomRelation`)
-
-    Example::
-
-        instance = MyModel.objects.first()
-        # Access all related objects
-        manager = instance.related_set  # Returns _InverseRelationManager
-        all_related = manager.all()
+    ``relation_name`` disambiguates multiple relations that share the same
+    through-table and target model (e.g. ``authors`` and ``editors`` both
+    pointing to Person).
     """
 
-    def __init__(self, relation_model: type[models.Model]):
-        self.relation_model = relation_model
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        return _InverseRelationManager(instance, self.relation_model)
-
-
-class GenericM2MManager:
-    """
-    Manager for generic many-to-many relationships using ContentType framework.
-
-    This manager provides a simple interface for managing relationships between
-    a model instance and related objects of any type, stored in a custom relation
-    model that inherits from AbstractCustomRelation.
-
-    Usage:
-        Instance managers are created automatically via GenericM2MDescriptor and
-        should not be instantiated directly.
-
-    Example::
-
-        # After defining invite_m2m_relations in CMSConfig:
-        blog_post_content = BlogPostContent.objects.first()
-        authors = blog_post_content.authors.all()  # Returns all related Person objects
-        blog_post_content.authors.add(person)  # Add a relation
-        blog_post_content.authors.remove(person)  # Remove a relation
-    """
-
-    def __init__(self, instance: models.Model, through_model: type[AbstractCustomRelation], related_field_name: str):
-        """Initialize the manager.
-
-        Args:
-            ``instance``: The model instance this manager is bound to
-            ``through_model``: The relation model (inherits from AbstractCustomRelation)
-            ``related_field_name``: The field name on the through_model pointing to related objects
-        """
+    def __init__(self, instance, through_model, target_model, *, side, relation_name):
         self.instance = instance
         self.through_model = through_model
-        self.related_field_name = related_field_name
-        self.content_type = ContentType.objects.get_for_model(instance)
+        self.target_model = target_model
+        self.side = side
+        self.relation_name = relation_name
 
-    def get_queryset(self):
-        """Return the queryset of relation objects for this instance."""
-        return self.through_model.objects.filter(content_type=self.content_type, object_id=self.instance.pk)
+    def _through_qs(self):
+        filters = {"relation_name": self.relation_name}
+        if self.side == FK_SIDE:
+            filters["instance"] = self.instance
+            filters["content_type"] = ContentType.objects.get_for_model(self.target_model)
+        else:
+            filters["content_type"] = ContentType.objects.get_for_model(type(self.instance))
+            filters["object_id"] = self.instance.pk
+        return self.through_model.objects.filter(**filters)
+
+    def _target_pk_field(self):
+        return "object_id" if self.side == FK_SIDE else "instance_id"
+
+    def _target_manager(self):
+        return getattr(self.target_model, "admin_manager", None) or self.target_model._default_manager
 
     def all(self):
-        """Return all related objects."""
-        return self._related_queryset()
-
-    def add(self, *objs):
-        """Add one or more objects to the relation.
-
-        Uses get_or_create to prevent duplicates.
-
-        Args:
-            ``*objs``: One or more model instances to add
-        """
-        for obj in objs:
-            self.through_model.objects.get_or_create(
-                **{
-                    self.related_field_name: obj,
-                    "content_type": self.content_type,
-                    "object_id": self.instance.pk,
-                }
-            )
-
-    def remove(self, *objs):
-        """Remove one or more objects from the relation.
-
-        Args:
-            ``*objs``: One or more model instances to remove
-        """
-        self.get_queryset().filter(**{f"{self.related_field_name}__in": objs}).delete()
-
-    def clear(self):
-        """Remove all relations for this instance."""
-        self.get_queryset().delete()
-
-    def _related_queryset(self):
-        """Return a queryset of the actual related objects (not relations)."""
-        related_model = self.through_model._meta.get_field("instance").related_model
-        # Use admin_manager if available (for versioned content models), otherwise use objects
-        manager = getattr(related_model, "admin_manager", None) or related_model.objects
-        return manager.filter(
-            pk__in=self.through_model.objects.filter(
-                content_type=self.content_type, object_id=self.instance.pk
-            ).values_list(self.related_field_name, flat=False)
+        return self._target_manager().filter(
+            pk__in=self._through_qs().values_list(self._target_pk_field(), flat=True)
         )
 
     def filter(self, *args, **kwargs):
@@ -465,155 +311,160 @@ class GenericM2MManager:
     def exists(self):
         return self.all().exists()
 
+    def add(self, *objs):
+        for obj in objs:
+            if self.side == FK_SIDE:
+                self.through_model.objects.get_or_create(
+                    instance=self.instance,
+                    content_type=ContentType.objects.get_for_model(self.target_model),
+                    object_id=obj.pk,
+                    relation_name=self.relation_name,
+                )
+            else:
+                self.through_model.objects.get_or_create(
+                    instance=obj,
+                    content_type=ContentType.objects.get_for_model(type(self.instance)),
+                    object_id=self.instance.pk,
+                    relation_name=self.relation_name,
+                )
 
-class GenericM2MDescriptor:
-    """
-    Descriptor that provides a GenericM2MManager for generic M2M relationships.
+    def remove(self, *objs):
+        pks = [o.pk for o in objs]
+        if self.side == FK_SIDE:
+            self._through_qs().filter(object_id__in=pks).delete()
+        else:
+            self._through_qs().filter(instance_id__in=pks).delete()
 
-    This descriptor is automatically assigned to models via relate_to or invite_m2m_relations
-    in CMSConfig and provides the manager interface for accessing relationships.
+    def clear(self):
+        self._through_qs().delete()
 
-    The descriptor returns itself when accessed on the class, and returns a
-    GenericM2MManager instance when accessed on a model instance.
-    """
 
-    def __init__(self, relation_model: type[models.Model], related_field_name: str):
-        """Initialize the descriptor.
+class _CustomM2MDescriptor:
+    """Descriptor that returns a :class:`_CustomM2MManager` bound to an instance."""
 
-        Args:
-            ``relation_model``: The relation model (inherits from AbstractCustomRelation)
-            ``related_field_name``: The field name on the relation model pointing to related objects
-        """
-        self.relation_model = relation_model
-        self.related_field_name = related_field_name
+    def __init__(self, through_model, target_model, side, relation_name):
+        self.through_model = through_model
+        self.target_model = target_model
+        self.side = side
+        self.relation_name = relation_name
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        return GenericM2MManager(instance, self.relation_model, self.related_field_name)
+        return _CustomM2MManager(
+            instance,
+            self.through_model,
+            self.target_model,
+            side=self.side,
+            relation_name=self.relation_name,
+        )
 
 
-class DummyM2MManager:
-    """
-    Dummy manager for simulating empty generic M2M relationships.
-
-    This manager provides a no-op interface that simulates an empty relationship,
-    used when a related model is not available or does not exist.
-
-    All operations are no-ops and queries return empty results.
-    """
-
-    def __init__(self, instance: models.Model, accessor: str):
-        """Initialize the dummy manager.
-
-        Args:
-            ``instance``: The model instance this manager is bound to
-            ``accessor``: The name of the accessor attribute
-        """
-        self.instance = instance
-        self.accessor = accessor
+class _DummyM2MManager:
+    """No-op manager returned when a relation's target model is not installed."""
 
     def all(self):
-        """Return an empty list (no relations exist)."""
         return []
 
+    def filter(self, *args, **kwargs):
+        return []
+
+    def count(self):
+        return 0
+
+    def exists(self):
+        return False
+
     def add(self, *objs):
-        """No-op: does nothing."""
         pass
 
     def remove(self, *objs):
-        """No-op: does nothing."""
         pass
 
     def clear(self):
-        """No-op: does nothing."""
         pass
 
-    def filter(self, *args, **kwargs):
-        return self.all()
 
-    def count(self):
-        return self.all()
-
-    def exists(self):
-        return self.all()
-
-
-class DummyM2MDescriptor:
-    """
-    Descriptor providing a dummy interface for unavailable generic M2M relations.
-
-    This descriptor is used when a related model specified in relate_to or invite_m2m_relations
-    cannot be found or is not yet available. It provides a safe interface that
-    returns empty results instead of raising errors.
-
-    The descriptor returns itself when accessed on the class, and returns a
-    DummyM2MManager instance when accessed on a model instance.
-    """
-
-    def __init__(self, accessor: str):
-        """Initialize the descriptor.
-
-        Args:
-            ``accessor``: The name of the accessor attribute
-        """
-        self.accessor = accessor
-
+class _DummyM2MDescriptor:
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        return DummyM2MManager(instance, self.accessor)
+        return _DummyM2MManager()
 
 
-def custom_relation_factory(model: type[models.Model], related_name: str | None = None) -> type[models.Model]:
+_AUTO_REVERSE = object()
+
+
+def _normalize_m2m_decl(decl):
+    """Return ``(forward_name, target_label, reverse_name_or_sentinel)``.
+
+    ``reverse_name_or_sentinel`` is ``_AUTO_REVERSE`` for 2-tuples (auto-derive
+    the reverse name), ``None`` to explicitly disable the reverse accessor, or
+    a string for an explicit reverse name.
     """
-    Factory function to create a relation model for use with relate_to or invite_m2m_relations.
+    if len(decl) == 2:
+        return decl[0], decl[1], _AUTO_REVERSE
+    if len(decl) == 3:
+        return decl[0], decl[1], decl[2]
+    raise ValueError(f"CMSConfig.m2m entries must be 2- or 3-tuples, got {decl!r}")
 
-    This function creates a concrete relation model that inherits from
-    AbstractCustomRelation and is linked to the provided model. The relation model
-    is required when using relate_to or invite_m2m_relations in a model's CMSConfig.
 
-    :param model: The model to create a relation model for.
-    :param related_name: Optional. The name of the reverse accessor on the model.
-        Defaults to ``relation_set``.
-    :returns: A new relation model class that can be used with ``relate_to`` or ``invite_m2m_relations``.
+def _get_owner_for_content(content_cls):
+    """Return the model that owns the relation (its grouper, or the content itself).
 
-    Example:
-
-    .. code-block:: python
-
-        from djangocms_custom_content.models import AbstractCustomContent, custom_relation_factory
-
-        class PersonContent(AbstractCustomContent):
-            # ... fields ...
-
-            class CMSConfig:
-                invite_m2m_relations = [("authors", "blog.BlogPost")]
-
-        # Create the relation model (required for invite_m2m_relations)
-        # Note: Create for the Grouper (Person), not the Content model
-        PersonRelation = custom_relation_factory(Person)
-
-    Notes:
-            - This must be called at the module level to ensure proper registration.
-            - The returned model class will have an ``instance`` ForeignKey to the provided model.
-            - It will also have the standard AbstractCustomRelation fields:
-              ``content_type``, ``object_id``, and the GenericForeignKey ``content_object``.
+    Uses ``local_fields`` and ``remote_field.model`` directly so this can be
+    called safely from a ``class_prepared`` handler (before the app registry
+    is ready, ``field.related_model`` would raise ``AppRegistryNotReady``).
     """
-    relation_model = ModelBase(
-        f"{model.__name__}Relation",
+    for field in content_cls._meta.local_fields:
+        if not isinstance(field, models.ForeignKey):
+            continue
+        target = field.remote_field.model
+        # Only handle direct class references — string refs ("app.Model") would
+        # require resolving the app registry, and groupers are always available
+        # by the time their content model is created.
+        if isinstance(target, type) and issubclass(target, CustomGrouperMixin):
+            return target
+    return content_cls
+
+
+def _through_model_name(content_cls):
+    return f"{content_cls.__name__}Relation"
+
+
+def _get_or_create_through_model(content_cls):
+    """Return the through-model for ``content_cls``, creating it if needed."""
+    through_name = _through_model_name(content_cls)
+    # Use the private all_models registry: class_prepared fires before
+    # apps.ready, so the public get_model() raises AppRegistryNotReady here.
+    existing = apps.all_models.get(content_cls._meta.app_label, {}).get(through_name.lower())
+    if existing is not None:
+        return existing
+
+    owner_cls = _get_owner_for_content(content_cls)
+    return ModelBase(
+        through_name,
         (AbstractCustomRelation,),
         {
-            "instance": models.ForeignKey(
-                model,
-                on_delete=models.CASCADE,
-                related_name="+",
-            ),
-            "__module__": model.__module__,
+            "instance": models.ForeignKey(owner_cls, on_delete=models.CASCADE, related_name="+"),
+            "__module__": content_cls.__module__,
         },
     )
-    if related_name is None:
-        related_name = "relation_set"
 
-    model.add_to_class(related_name, InverseRelationDescriptor(relation_model))  # type: ignore
-    return relation_model  # type: ignore
+
+def _on_class_prepared(sender, **kwargs):
+    """Auto-create the through-model for content classes that declare ``CMSConfig.m2m``."""
+    try:
+        if not issubclass(sender, AbstractCustomContent):
+            return
+    except TypeError:
+        return
+    cms_config = getattr(sender, "CMSConfig", None)
+    if cms_config is None:
+        return
+    if not getattr(cms_config, "m2m", None):
+        return
+    _get_or_create_through_model(sender)
+
+
+class_prepared.connect(_on_class_prepared)

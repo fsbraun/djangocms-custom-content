@@ -1,64 +1,54 @@
 M2M Relationships Explained
 ===========================
 
-djangocms-custom-content provides flexible many-to-many relationships through two approaches that differ in **direction and semantics**:
+djangocms-custom-content offers a single declarative API for many-to-many
+relationships between custom content models: ``CMSConfig.m2m``. This page
+explains what the framework generates from that declaration and why the
+design looks the way it does.
 
-1. ``invite_m2m_relations`` - Content model **requests** relations from target models (pull)
-2. ``relate_to`` - Model **pushes** relations onto target models (push)
+The Through Model
+-----------------
 
-The Through Model: ``custom_relation_factory``
------------------------------------------------
+A regular Django ``ManyToManyField`` creates an **automatic through table**
+that links two specific models. That's perfect when the relation is fixed at
+design time, but custom content often needs more flexibility:
 
-Traditional M2M relationships in Django use an **automatic through model** (join table) that links two specific models:
+- the same accessor should be able to point at content models from optional
+  contrib apps;
+- you don't want to maintain a hand-written join model per relation pair;
+- the table should be language-independent (attached to the grouper rather
+  than every language version).
 
-.. code-block:: python
-
-    # Standard Django M2M
-    class Article(models.Model):
-        authors = models.ManyToManyField(Author)  # Creates automatic through model
-
-The through model has two ForeignKeys (one to each side).
-
-**Problem:** This only works for relating to ONE specific model type. You can't use one M2M field for relating to different model types.
-
-**Solution:** ``custom_relation_factory``
-
-djangocms-custom-content creates a **manual through model** that uses:
-
-- **One ForeignKey** to the source model (specific)
-- **One GenericForeignKey** to ANY model (flexible)
-
-This enables relating a source model to objects of ANY type.
-
-**How it Works**
+To handle this, the framework generates one through-model per declaring
+content class. The schema combines a **forward FK** to the declarer with a
+**GenericForeignKey** to the target:
 
 .. code-block:: python
 
-    from djangocms_custom_content.models import custom_relation_factory
-
-    class PersonContent(AbstractCustomContent):
-        person = models.ForeignKey(Person, on_delete=models.CASCADE)
-        # ... other fields ...
-
-    # Manually create the through model for the Grouper (Person)
-    PersonRelation = custom_relation_factory(Person)
-
-**Generated Through Model Structure**
-
-The ``custom_relation_factory`` creates a relation model like:
-
-.. code-block:: python
-
-    class PersonContentRelation(AbstractCustomRelation):
-        # FK to source (specific model)
-        instance = models.ForeignKey(PersonContent, on_delete=models.CASCADE)
-
-        # Can relate to ANY model
+    class BlogPostContentRelation(AbstractCustomRelation):
+        instance = models.ForeignKey(BlogPost, on_delete=models.CASCADE)  # FK to grouper
         content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
         object_id = models.PositiveIntegerField()
-        content_object = GenericForeignKey('content_type', 'object_id')
+        content_object = GenericForeignKey("content_type", "object_id")
+        relation_name = models.CharField(max_length=100)
 
-**The GenericForeignKey Magic**
+You never write this class by hand — the framework generates it from a
+``CMSConfig.m2m`` declaration on the corresponding ``AbstractCustomContent``
+subclass:
+
+.. code-block:: python
+
+    class BlogPostContent(AbstractCustomContent):
+        post = models.ForeignKey(BlogPost, on_delete=models.CASCADE)
+
+        class CMSConfig:
+            m2m = [
+                ("authors", "people.Person"),
+                ("categories", "categories.FlatCategory"),
+            ]
+
+What lives where
+----------------
 
 .. list-table::
    :widths: 30 70
@@ -67,39 +57,40 @@ The ``custom_relation_factory`` creates a relation model like:
    * - Field
      - Purpose
    * - ``instance``
-     - FK to PersonContent (always the same model)
-   * - ``content_type``
-     - Stores which model type is related (BlogPost, Article, etc.)
-   * - ``object_id``
-     - Stores the ID of the related object
+     - FK to the declarer's grouper (or to the content model itself if it has
+       no grouper). The relation lives on the grouper so it's the same across
+       all language versions.
+   * - ``content_type`` / ``object_id``
+     - GenericForeignKey to the target object. Allows the same through-table
+       to relate to any number of distinct target model types.
    * - ``content_object``
-     - Virtual field that returns the actual object (BlogPost #5, Article #3, etc.)
+     - Virtual accessor that resolves the GFK to the actual target instance.
+   * - ``relation_name``
+     - Distinguishes multiple ``m2m`` entries that share the same
+       through-table — e.g. ``("authors", "people.Person")`` and
+       ``("editors", "people.Person")`` both store rows here but stay
+       independent because the rows carry different ``relation_name`` values.
 
-**Example Data**
+Why a GenericForeignKey?
+------------------------
 
-One ``PersonContentRelation`` table can store relations to MULTIPLE model types:
+A single ``BlogPostContentRelation`` table can carry relations to *any*
+target model. Conceptually, rows look like this:
 
 .. code-block:: sql
 
-    -- Person 2 as author of BlogPost 1
-    INSERT INTO person_content_relation
-      (instance_id, content_type_id, object_id)
-    VALUES (2, 42, 1);  -- content_type_id 42 = BlogPost
+    -- BlogPost 1 has author Person 2
+    INSERT INTO blogpost_content_relation (instance_id, content_type_id, object_id, relation_name)
+    VALUES (1, 42, 2, 'authors');   -- content_type 42 = Person
 
-    -- Person 2 as author of Article 5
-    INSERT INTO person_content_relation
-      (instance_id, content_type_id, object_id)
-    VALUES (2, 43, 5);  -- content_type_id 43 = Article
+    -- BlogPost 1 is in category FlatCategory 7
+    INSERT INTO blogpost_content_relation (instance_id, content_type_id, object_id, relation_name)
+    VALUES (1, 43, 7, 'categories');   -- content_type 43 = FlatCategory
 
-    -- Person 2 as author of Product 3
-    INSERT INTO person_content_relation
-      (instance_id, content_type_id, object_id)
-    VALUES (2, 44, 3);  -- content_type_id 44 = Product
+Both relations live in the same physical table, scoped by ``relation_name``.
 
-**Single PersonContent can relate to thousands of BlogPosts, Articles, Products, etc.**
-
-Comparison: Django M2M vs. Generic M2M
---------------------------------------
+Comparison: Django M2M vs. Custom M2M
+-------------------------------------
 
 .. list-table::
    :widths: 30 35 35
@@ -107,223 +98,79 @@ Comparison: Django M2M vs. Generic M2M
 
    * - Aspect
      - Standard Django M2M
-     - Generic M2M (via custom_relation_factory)
+     - djangocms-custom-content M2M
+   * - Declaration
+     - ``ManyToManyField`` on each model
+     - One ``m2m`` entry per relation
    * - Through model
-     - Auto-generated
-     - Manually generated
+     - Auto-generated per pair, one table per relation
+     - Auto-generated per declarer, one table per content model
    * - Flexibility
-     - Fixed to one model pair
-     - Can relate to ANY model
-     - Reusability
-     - Each M2M needs separate field
-     - One through model relates to all targets
-   * - ForeignKey 1
-     - ForeignKey to Model A
-     - ForeignKey to source
-   * - ForeignKey 2
-     - ForeignKey to Model B
-     - GenericForeignKey (ANY model)
-   * - Storage
-     - Separate table per relationship
-     - Single generic table
-   * - Use case
-     - Simple one-to-one M2M
-     - Multi-target relations
+     - Fixed pair (Model A ↔ Model B)
+     - Any target via GenericForeignKey
+   * - Reverse accessor
+     - Always created (``..._set``)
+     - Auto by default, overridable, or suppressible
+   * - Optional targets
+     - Hard failure if target missing
+     - Dummy accessor when target app not installed
+   * - Language semantics
+     - Attached to the model the field is on
+     - Attached to the grouper (language-independent)
 
-Django M2M Example
-~~~~~~~~~~~~~~~~~~
+Accessor placement
+------------------
 
-.. code-block:: python
-
-    # Separate through models needed for each relation type
-    class BlogPost(models.Model):
-        authors = models.ManyToManyField(Person)      # Through: BlogPost_authors
-
-    class Article(models.Model):
-        authors = models.ManyToManyField(Person)      # Through: Article_authors
-
-    class Product(models.Model):
-        creators = models.ManyToManyField(Person)     # Through: Product_creators
-
-**Result:** Three separate though tables, each only works for its specific pair.
-
-Generic M2M Example
-~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-    class PersonContent(AbstractCustomContent):
-        pass
-
-    # Single through model for ALL relations
-    # Note: Factory is created for the Grouper (Person), not the Content model
-    PersonRelation = custom_relation_factory(Person)
-
-    # PersonRelation table can manage relations to:
-    # - BlogPost
-    # - Article
-    # - Product
-    # - ANY Django model
-
-**Result:** One table handles all relations!
-
-How the Two Approaches Use ``custom_relation_factory``
--------------------------------------------------------
-
-Both ``relate_to`` and ``invite_m2m_relations`` use the through model created by ``custom_relation_factory``:
-
-**``invite_m2m_relations`` (Content Model Requests)**
-
-The source model **knows about** and **requests** relations from target models.
-
-**Semantics:** "I invite you to provide relations for me. Do you have a suitable generic through table?"
-
-**Direction:** Known target → Source
-
-**Flow:**
-
-1. Source model declares ``invite_m2m_relations`` listing targets
-2. ``custom_relation_factory`` creates through model for source
-3. CustomContentExtension reads the declaration
-4. GenericM2MDescriptor is added to SOURCE model (not target)
-5. If target unavailable: Creates dummy accessor (graceful degradation)
-
-**Example:**
+The forward accessor is installed on the declarer's **owner**: the grouper if
+one exists, otherwise the content model itself. The reverse accessor is
+installed on the target.
 
 .. code-block:: python
 
     class BlogPostContent(AbstractCustomContent):
         class CMSConfig:
-            # "I request relations from Person"
-            invite_m2m_relations = [("authors", "people.Person")]
+            m2m = [("authors", "people.Person")]
 
-    # Creates the through model with GenericForeignKey
-    # The factory is for the target model (Person), not the source
-    PersonRelation = custom_relation_factory(Person)
+    # owner = BlogPost (Person's grouper-having declarer)
+    blog_post.authors           # forward — on grouper
+    person.blogpost_set         # reverse — auto-named "{owner}_set"
 
-**Result:**
-
-.. code-block:: python
-
-    blog_post = BlogPostContent.objects.first()
-    person = Person.objects.first()
-
-    # Source model gets the accessor (via GenericM2MDescriptor)
-    blog_post.authors.add(person)
-    blog_post.authors.all()  # Uses PersonRelation table
-
-
-Approach 2: ``relate_to`` (Model Pushes to Targets)
----------------------------------------------------
-
-The source model **pushes** itself onto target models you have no control over.
-
-**Semantics:** "I'm adding an accessor to you, so you can see me."
-
-**Direction:** Source → Multiple unknown targets
-
-**Flow:**
-
-1. Source model declares ``relate_to`` listing target paths
-2. ``custom_relation_factory`` creates through model for source
-3. ``register_m2m_relations()`` is called
-4. GenericM2MDescriptor is added to TARGET models (not source)
-5. Target models remain unaware of source
-
-**Example:**
+The 3-tuple form lets you override or disable the reverse name:
 
 .. code-block:: python
 
-    class FlatCategory(AbstractCustomContent):
-        class CMSConfig:
-            # "I'm adding categories accessor to BlogPost and Article"
-            relate_to = [
-                ("categories", "blog.BlogPost"),
-                ("categories", "article.Article"),
-            ]
+    m2m = [
+        ("authors", "people.Person", "wrote"),   # person.wrote
+        ("hidden", "people.Person", None),       # no reverse
+    ]
 
-    # Creates the through model with GenericForeignKey
-    FlatCategoryRelation = custom_relation_factory(FlatCategory)
+Optional targets
+----------------
 
-**Result:**
+If the target model isn't installed (e.g. an optional contrib app), the
+forward accessor is wired to a dummy manager. Reads return empty results,
+writes are no-ops. This keeps a content model usable even when an optional
+relation's target isn't enabled in the project.
 
 .. code-block:: python
 
-    blog_post = BlogPost.objects.first()
-    article = Article.objects.first()
-    category = FlatCategory.objects.first()
-
-    # Target models get the accessor (via GenericM2MDescriptor)
-    blog_post.categories.add(category)
-    article.categories.add(category)
-
-    # Both use same FlatCategoryRelation table!
-
-
-Design Differences
-------------------
-
-.. list-table::
-   :widths: 20 40 40
-   :header-rows: 1
-
-   * - Aspect
-     - ``invite_m2m_relations``
-     - ``relate_to``
-   * - Who requests
-     - TARGET model
-     - SOURCE model
-   * - Semantics
-     - "I request from you"
-     - "I push to you"
-   * - Accessor added to
-     - TARGET model
-     - TARGET model(s)
-   * - Source awareness
-     - Unaware of target
-     - Knows target
-   * - Target awareness
-     - Expected to support it
-     - Unaware of source
-   * - If target unavailable
-     - Dummy accessor created
-     - Raises improperly configured exception
-   * - Typical sources
-     - Grouper models
-     - Grouper models
-   * - Typical targets
-     - Content models
-     - Content models
-
+    blog_post.optional_relation.all()       # → []
+    blog_post.optional_relation.add(thing)  # no-op, no error
 
 Accessing Relations
 -------------------
 
-Both provide identical manager interfaces (backed by the through model):
+The forward and reverse accessors return the same manager interface:
 
 .. code-block:: python
 
-    # add() - Add objects
     model.accessor.add(obj1, obj2)
-
-    # all() - Get all related
-    related = model.accessor.all()
-
-    # filter() - Filter related
-    related = model.accessor.filter(name="Django")
-
-    # remove() - Remove specific
     model.accessor.remove(obj1)
-
-    # clear() - Remove all
     model.accessor.clear()
-
-    # count() - Count relations
-    count = model.accessor.count()
-
-    # exists() - Check existence
-    if model.accessor.exists():
-        ...
+    model.accessor.all()        # QuerySet
+    model.accessor.filter(...)  # QuerySet — chain on top
+    model.accessor.count()
+    model.accessor.exists()
 
 See Also
 --------

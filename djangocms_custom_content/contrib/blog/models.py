@@ -28,8 +28,9 @@ class BlogPostContent(AbstractCustomContent):
     class CMSConfig:
         enable_versioning = True
         enable_frontend_editing = True
-        invite_m2m_relations = [
+        m2m = [
             ("authors", "djangocms_custom_content_people.Person"),
+            ("categories", "djangocms_custom_content_categories.FlatCategory"),
         ]
 
     def get_template(self):

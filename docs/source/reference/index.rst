@@ -14,15 +14,14 @@ Models
    :members:
    :show-inheritance:
 
+.. autoclass:: djangocms_custom_content.models.AbstractCustomRelation
+   :members:
+   :show-inheritance:
+
 .. autoclass:: djangocms_custom_content.models.CustomGrouperMixin
    :members:
 
 .. autoclass:: djangocms_custom_content.models.CustomContentMixin
-   :members:
-
-.. autofunction:: djangocms_custom_content.models.custom_relation_factory
-
-.. autoclass:: djangocms_custom_content.models.GenericM2MManager
    :members:
 
 CMS Toolbars
@@ -36,10 +35,6 @@ Admin
 -----
 
 .. autoclass:: djangocms_custom_content.admin.CustomGrouperAdminMixin
-   :members:
-   :show-inheritance:
-
-.. autoclass:: djangocms_custom_content.admin.CustomContentAdminMixin
    :members:
    :show-inheritance:
 
