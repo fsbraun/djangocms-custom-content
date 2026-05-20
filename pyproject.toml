@@ -30,7 +30,7 @@ classifiers = [
 dynamic = [ "version" ]
 dependencies = [
   "django>=5.2",
-  "django-cms>=5.0",
+  "django-cms>=5",
 ]
 
 optional-dependencies.test = [
