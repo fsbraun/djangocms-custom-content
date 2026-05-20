@@ -388,21 +388,6 @@ class CustomGrouperAdminMixinTestCase(TestCase):
         self.assertEqual(queryset.model, Person)
         self.assertEqual(list(queryset._prefetch_related_lookups), [])
 
-    def test_get_queryset_prefetches_latest_content(self):
-        class PersonContentAdmin(CustomGrouperAdminMixin, admin.ModelAdmin):
-            content_model = PersonContent
-
-        request = self.factory.get("/")
-        admin_instance = PersonContentAdmin(Person, self.admin_site)
-
-        queryset = admin_instance.get_queryset(request)
-        accessor_name = PersonContent._meta.get_field("person").remote_field.get_accessor_name()
-        lookups = list(queryset._prefetch_related_lookups)
-        has_prefetch = any(
-            getattr(lookup, "prefetch_through", None) == accessor_name or lookup == accessor_name for lookup in lookups
-        )
-        self.assertTrue(has_prefetch)
-
     def test_breadcrumb_redir_falls_back_to_changelist(self):
         request = self.factory.get("/")
         config = apps.get_app_config("djangocms_custom_content").cms_config

@@ -1,5 +1,5 @@
-Article with APPhooks and CMS Plugins
-=====================================
+Article with app hooks and CMS Plugins
+======================================
 
 Build on the basic article model by adding CMS plugins and an app hook for frontend display.
 
