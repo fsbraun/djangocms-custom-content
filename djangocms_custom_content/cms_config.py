@@ -163,7 +163,12 @@ class CustomContentConfig(CMSAppConfig):
                 reverse_name = auto_reverse_name
             try:
                 target_cls = apps.get_model(target_label)
-            except LookupError:
+            except (LookupError, ValueError):
+                # LookupError: target app or model is not installed.
+                # ValueError: target_label is malformed (e.g. missing or extra
+                # dots). In both cases we fall back to a dummy descriptor so
+                # the m2m relation is effectively ignored and the rest of the
+                # framework keeps working.
                 owner_cls.add_to_class(forward_name, _DummyM2MDescriptor())
                 continue
 

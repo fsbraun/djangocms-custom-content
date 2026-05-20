@@ -252,6 +252,44 @@ class BlogContribIntegrationTestCase(TransactionTestCase):
         self.assertCountEqual(list(self.category.blogpost_set.all()), [self.blog_post])
 
 
+class MissingTargetModelTestCase(TransactionTestCase):
+    """m2m entries pointing at uninstalled or malformed targets must be ignored."""
+
+    def setUp(self):
+        self.topic = RelTopic.objects.create()
+
+    def test_uninstalled_target_returns_dummy_manager(self):
+        # nonexistent_app.Ghost is not installed — accessor exists but is no-op
+        self.assertTrue(hasattr(self.topic, "ghosts"))
+        self.assertEqual(self.topic.ghosts.all(), [])
+        self.assertEqual(self.topic.ghosts.count(), 0)
+        self.assertFalse(self.topic.ghosts.exists())
+
+    def test_uninstalled_target_writes_are_no_ops(self):
+        # add / remove / clear shouldn't crash, shouldn't write any rows
+        self.topic.ghosts.add("anything")  # would crash on a real manager
+        self.topic.ghosts.remove("anything")
+        self.topic.ghosts.clear()
+        self.assertFalse(self.topic.ghosts.exists())
+
+    def test_malformed_label_is_also_ignored(self):
+        # "no_dot_here" has no app.Model shape — also fed to the dummy path
+        self.assertTrue(hasattr(self.topic, "malformed"))
+        self.assertEqual(self.topic.malformed.all(), [])
+
+    def test_through_model_still_created(self):
+        # The through-model is local to the declaring app and must exist even
+        # when every relation's target is missing.
+        through = apps.get_model("test_app", "RelTopicContentRelation")
+        self.assertIsNotNone(through)
+
+    def test_resolvable_relations_still_work_alongside_missing(self):
+        # The presence of unresolvable entries must not break resolvable ones.
+        tag = TagTarget.objects.create(name="x")
+        self.topic.tags.add(tag)
+        self.assertCountEqual(list(self.topic.tags.all()), [tag])
+
+
 class AbstractRelationStructureTestCase(TestCase):
     """The auto-generated through-model carries the expected fields and behavior."""
 

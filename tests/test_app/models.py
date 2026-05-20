@@ -53,6 +53,8 @@ class RelTopicContent(AbstractCustomContent):
             ("tags", "test_app.TagTarget"),                       # auto reverse: reltopic_set
             ("featured", "test_app.TagTarget", "featured_in"),    # explicit reverse name
             ("hidden", "test_app.OtherTarget", None),             # no reverse accessor
+            ("ghosts", "nonexistent_app.Ghost"),                  # target app not installed
+            ("malformed", "no_dot_here"),                         # malformed target label
         ]
 
     def __str__(self):
