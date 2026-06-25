@@ -4,7 +4,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from filer.fields.image import FilerImageField
 
-from djangocms_custom_content.models import AbstractCustomContent, AbstractCustomGrouper, custom_relation_factory
+from djangocms_custom_content.models import AbstractCustomContent, AbstractCustomGrouper
 
 User = get_user_model()
 
@@ -51,6 +51,3 @@ class PersonTeaser(CMSPlugin):
 
     class Meta:
         verbose_name = _("Person teaser")
-
-
-PersonRelation = custom_relation_factory(Person)

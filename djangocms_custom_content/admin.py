@@ -3,11 +3,15 @@ from django.apps import apps
 from django.http import HttpResponseRedirect
 from django.urls import path
 
+from djangocms_custom_content.relation_admin import RelationAdminMixin
 
-class CustomGrouperAdminMixin:
+
+class CustomGrouperAdminMixin(RelationAdminMixin):
     """Admin mixin to redirect content endpoints for grouper admins.
 
-    Provides a breadcrumb redirect compatible with django CMS versioning.
+    Provides a breadcrumb redirect compatible with django CMS versioning, and
+    (via :class:`RelationAdminMixin`) renders any ``RelationField`` on the model
+    as an autocomplete multi-select — sortable when the relation is ordered.
 
     Prefetching of the latest related content (``_admin_prefetch_cache``) is
     handled by ``cms.admin.utils.GrouperModelAdmin.get_queryset``, which the

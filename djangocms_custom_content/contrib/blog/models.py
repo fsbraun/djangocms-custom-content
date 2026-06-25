@@ -4,10 +4,22 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from djangocms_custom_content.models import AbstractCustomContent, AbstractCustomGrouper
+from djangocms_custom_content.relations import RelationField
 
 
 class BlogPost(AbstractCustomGrouper):
-    pass
+    # Grouper-anchored relations: survive version copies, read like M2M.
+    # The forward accessor lives on the post; the ``related_name`` is the
+    # reverse accessor invited onto the target without it declaring anything.
+    authors = RelationField(
+        "djangocms_custom_content_people.Person",
+        related_name="authored_posts",
+        ordered=True,
+    )
+    categories = RelationField(
+        "djangocms_custom_content_categories.FlatCategory",
+        related_name="blog_posts",
+    )
 
 
 class BlogPostContent(AbstractCustomContent):
@@ -28,9 +40,6 @@ class BlogPostContent(AbstractCustomContent):
     class CMSConfig:
         enable_versioning = True
         enable_frontend_editing = True
-        invite_m2m_relations = [
-            ("authors", "djangocms_custom_content_people.Person"),
-        ]
 
     def get_template(self):
         return "blog/detail.html"
