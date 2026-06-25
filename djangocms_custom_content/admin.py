@@ -1,9 +1,15 @@
+from typing import TYPE_CHECKING
+
 from cms.utils.urlutils import admin_reverse
 from django.apps import apps
+from django.db import models
 from django.http import HttpResponseRedirect
 from django.urls import path
 
 from djangocms_custom_content.relation_admin import RelationAdminMixin
+
+if TYPE_CHECKING:
+    from django.contrib.admin import AdminSite
 
 
 class CustomGrouperAdminMixin(RelationAdminMixin):
@@ -18,6 +24,12 @@ class CustomGrouperAdminMixin(RelationAdminMixin):
     concrete admin classes inherit from, so this mixin does not override
     ``get_queryset``.
     """
+
+    if TYPE_CHECKING:
+        # Provided by the ModelAdmin / GrouperModelAdmin this mixin is combined with.
+        admin_site: AdminSite
+        model: type[models.Model]
+        content_model: type[models.Model]
 
     def get_urls(self):
         """Register breadcrumb redirect URLs for grouper admin views."""

@@ -28,6 +28,8 @@ opt-in feature; without it no ordering column is created.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -104,6 +106,10 @@ class CustomRelation(models.Model):
     object_id = models.PositiveIntegerField()
     target = GenericForeignKey("content_type", "object_id")
 
+    if TYPE_CHECKING:
+        # Concrete ``source`` FK is added per-table by relation_through_factory.
+        source: models.ForeignKey
+
     class Meta:
         abstract = True
 
@@ -152,7 +158,7 @@ def relation_through_factory(
         "Meta": type("Meta", (), meta_attrs),
         "__module__": module or owner_model.__module__,
     }
-    through = ModelBase(name or f"{owner_model.__name__}Relation", (base,), attrs)
+    through = cast("type[models.Model]", ModelBase(name or f"{owner_model.__name__}Relation", (base,), attrs))
     _through_registry.add(through)
     return through
 
@@ -172,7 +178,14 @@ class RelationManager:
     the through is ordered, results are ordered by the through's ``order``.
     """
 
-    def __init__(self, instance, through, target_model, *, ordered):
+    def __init__(
+        self,
+        instance: models.Model,
+        through: type[models.Model],
+        target_model: type[models.Model],
+        *,
+        ordered: bool,
+    ):
         self.instance = instance
         self.through = through
         self.target_model = target_model
@@ -208,10 +221,13 @@ class RelationManager:
     # Write API normalises content → grouper and stores the stable pk.
     def add(self, *objs):
         ct = _content_type_for(self.target_model)
-        next_order = (self._edges().aggregate(models.Max("order"))["order__max"] or 0) if self.ordered else None
+        next_order = (self._edges().aggregate(models.Max("order"))["order__max"] or 0) if self.ordered else 0
         for obj in objs:
             grouper = grouper_of(obj)
-            defaults = {"order": (next_order := next_order + 1)} if self.ordered else {}
+            defaults = {}
+            if self.ordered:
+                next_order += 1
+                defaults["order"] = next_order
             self.through.objects.get_or_create(
                 source=self.instance, content_type=ct, object_id=grouper.pk, defaults=defaults
             )
@@ -240,7 +256,7 @@ class RelationManager:
 class ReverseRelationManager:
     """Reverse accessor ``target.<related_name>`` → queryset of source groupers."""
 
-    def __init__(self, instance, through, source_model):
+    def __init__(self, instance: models.Model, through: type[models.Model], source_model: type[models.Model]):
         self.instance = instance
         self.through = through
         self.source_model = source_model
@@ -304,7 +320,7 @@ def iter_relation_fields(model: type[models.Model]):
 
 
 class ReverseRelationDescriptor:
-    def __init__(self, through, source_model):
+    def __init__(self, through: type[models.Model], source_model: type[models.Model]):
         self.through = through
         self.source_model = source_model
 
@@ -354,6 +370,8 @@ class RelationField:
     def _bind_target(self, target_model):
         self.target_model = grouper_model_of(target_model)
         if self.related_name:
+            # contribute_to_class (which sets through/owner_model) always runs first.
+            assert self.through is not None and self.owner_model is not None
             setattr(
                 self.target_model,
                 self.related_name,
