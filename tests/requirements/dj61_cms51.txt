@@ -1,4 +1,0 @@
--r base.txt
-
-Django>=6.1.0a1,<6.2
-django-cms>=5.1.0a1,<5.2
