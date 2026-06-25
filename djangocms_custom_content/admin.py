@@ -1,47 +1,19 @@
 from cms.utils.urlutils import admin_reverse
 from django.apps import apps
-from django.db import models
-from django.db.models import Prefetch
-from django.http import HttpRequest, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.urls import path
 
 
 class CustomGrouperAdminMixin:
-    """Admin mixin to optimize queries and redirect content endpoints.
+    """Admin mixin to redirect content endpoints for grouper admins.
 
-    This mixin prefetches related content for admin lists and provides a
-    breadcrumb redirect compatible with django CMS versioning.
+    Provides a breadcrumb redirect compatible with django CMS versioning.
+
+    Prefetching of the latest related content (``_admin_prefetch_cache``) is
+    handled by ``cms.admin.utils.GrouperModelAdmin.get_queryset``, which the
+    concrete admin classes inherit from, so this mixin does not override
+    ``get_queryset``.
     """
-
-    def get_queryset(self, request: HttpRequest):
-        """Return a queryset prefetched with latest related content.
-
-        Args:
-            ``request``: The current admin request.
-
-        Returns:
-            The queryset, optionally prefetched with admin manager content.
-        """
-        qs = super().get_queryset(request)
-        content_model = getattr(self, "content_model", None)
-        if content_model is None:
-            return qs
-
-        grouper_fk_field = next(
-            (
-                f
-                for f in content_model._meta.get_fields()
-                if isinstance(f, models.ForeignKey) and f.related_model is self.model
-            ),
-            None,
-        )
-        if grouper_fk_field is None:
-            return qs
-        accessor_name = grouper_fk_field.remote_field.get_accessor_name()
-        manager = content_model._meta.managers_map.get("admin_manager", content_model._default_manager)
-        prefetch = Prefetch(accessor_name, queryset=manager.latest_content(), to_attr="_admin_prefetch_cache")
-
-        return qs.prefetch_related(prefetch)
 
     def get_urls(self):
         """Register breadcrumb redirect URLs for grouper admin views."""
