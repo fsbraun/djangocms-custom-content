@@ -30,7 +30,7 @@ jobs:
         ]
         exclude:
           # Python 3.14 only works with Django 5.2+
-           # Python 3.10 and 3.11 only supported until Django 5.2
+          # Python 3.10 and 3.11 only supported until Django 5.2
           - python-version: "3.10"
             requirements-file: dj60_cms50.txt
           - python-version: "3.11"
