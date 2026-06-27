@@ -14,6 +14,68 @@ from pathlib import Path
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent.parent))  # this way, we don't have to install the app
 
+# Configure a minimal Django so autodoc can import the (concrete-model) modules.
+# Trimmed compared to tests/test_settings: drops filer/easy_thumbnails and the
+# contrib example apps, which the documented core modules do not need.
+import django  # isort:skip  # noqa
+from django.conf import settings  # isort:skip  # noqa
+
+if not settings.configured:
+    _INSTALLED_APPS = [
+        "django.contrib.contenttypes",
+        "django.contrib.auth",
+        "django.contrib.sites",
+        "django.contrib.sessions",
+        "django.contrib.admin",
+        "django.contrib.messages",
+        "cms",
+        "menus",
+        "treebeard",
+        "sekizai",
+        "djangocms_custom_content",
+    ]
+    try:  # versioning is optional but documented modules import from it lazily
+        import djangocms_versioning  # noqa
+
+        _INSTALLED_APPS.append("djangocms_versioning")
+    except ImportError:
+        pass
+
+    settings.configure(
+        INSTALLED_APPS=_INSTALLED_APPS,
+        DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
+        MIDDLEWARE=[
+            "django.contrib.sessions.middleware.SessionMiddleware",
+            "django.contrib.auth.middleware.AuthenticationMiddleware",
+            "django.contrib.messages.middleware.MessageMiddleware",
+            "cms.middleware.user.CurrentUserMiddleware",
+            "cms.middleware.page.CurrentPageMiddleware",
+            "cms.middleware.toolbar.ToolbarMiddleware",
+            "cms.middleware.language.LanguageCookieMiddleware",
+        ],
+        TEMPLATES=[
+            {
+                "BACKEND": "django.template.backends.django.DjangoTemplates",
+                "APP_DIRS": True,
+                "OPTIONS": {
+                    "context_processors": [
+                        "django.template.context_processors.request",
+                        "django.contrib.auth.context_processors.auth",
+                        "django.contrib.messages.context_processors.messages",
+                        "sekizai.context_processors.sekizai",
+                        "cms.context_processors.cms_settings",
+                    ],
+                },
+            },
+        ],
+        CMS_TEMPLATES=(("page.html", "Page"),),
+        CMS_CONFIRM_VERSION4=True,
+        SITE_ID=1,
+        SECRET_KEY="docs-build-key",
+        DEFAULT_AUTO_FIELD="django.db.models.BigAutoField",
+    )
+    django.setup()
+
 import djangocms_custom_content  # isort:skip  # noqa
 # fmt: on
 
@@ -43,33 +105,8 @@ autodoc_default_options = {
 }
 autodoc_typehints = "description"
 autodoc_preserve_defaults = True
-autodoc_mock_imports = [
-    "django",
-    "django.db",
-    "django.db.models",
-    "django.db.models.base",
-    "django.db.models.fields",
-    "django.db.models.fields.reverse_related",
-    "django.db.models.managers",
-    "django.contrib",
-    "django.contrib.admin",
-    "django.contrib.contenttypes",
-    "django.contrib.contenttypes.fields",
-    "django.contrib.contenttypes.models",
-    "django.utils",
-    "django.utils.translation",
-    "django.core.cache",
-    "cms",
-    "cms.api",
-    "cms.app_base",
-    "cms.models",
-    "cms.models.fields",
-    "cms.models.managers",
-    "cms.plugin_base",
-    "cms.plugin_pool",
-    "cms.toolbar",
-    "cms.toolbar.base",
-]
+# Django/cms are configured and importable for real (see settings.configure
+# above), so no autodoc_mock_imports are needed.
 
 
 def autodoc_skip_member(app, what, name, obj, skip, options):

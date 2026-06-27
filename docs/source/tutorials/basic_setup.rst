@@ -80,9 +80,9 @@ Create ``my_content/models.py``:
         body = models.TextField()
 
         class CMSConfig:
-            # Make editable in frontend and versionable
-            editable = True
-            versionable = True
+            # Make editable in the frontend and versionable
+            enable_frontend_editing = True
+            enable_versioning = True
 
         def __str__(self):
             return self.title
@@ -132,4 +132,4 @@ Next Steps:
 
 - :doc:`../how-to/m2m_relations` - Add relationships to other models
 - :doc:`../explanation/architecture` - Understand the grouper/content pattern
-- :doc:`blog_example` - Build a complete blog system
+- :doc:`../how-to/blog` - Build on the bundled blog example

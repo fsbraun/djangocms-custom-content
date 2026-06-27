@@ -45,22 +45,38 @@ Example:
         body="German content..."
     )
 
-M2M Relations Use Generic FK
-----------------------------
+Relations Are Grouper-Anchored
+------------------------------
 
-Generic foreign keys allow flexible relationships:
+Relations between content are declared with
+:class:`~djangocms_custom_content.relations.RelationField` on a **grouper**, and
+read like a ``ManyToManyField``:
 
 .. code-block:: python
 
-    class PersonRelation(AbstractCustomRelation):
-        instance = ForeignKey(PersonContent)        # Which person
-        content_type = ForeignKey(ContentType)      # What model type
-        object_id = PositiveIntegerField()          # Which object
-        related_field_name = CharField()             # "authors", "contributors", etc.
+    from djangocms_custom_content.relations import RelationField
 
-This single model stores relationships to ANY Django model without FK hardcoding.
+    class BlogPost(AbstractCustomGrouper):
+        authors = RelationField("people.Person", related_name="authored_posts", ordered=True)
+
+Each relation gets its own through table with a concrete ``source`` foreign key
+to the owning grouper and a ``GenericForeignKey`` ``target``, so one relation can
+point at groupers of any type without hardcoding FKs:
+
+.. code-block:: python
+
+    # Conceptual shape of the generated through model
+    class BlogPostAuthorsRelation(OrderedCustomRelation):
+        source = ForeignKey(BlogPost)               # the owning grouper
+        content_type = ForeignKey(ContentType)      # which target type
+        object_id = PositiveIntegerField()          # which target grouper
+        target = GenericForeignKey(...)             # resolved target
+        order = PositiveIntegerField()              # only when ordered=True
+
+Because edges store the **grouper's** stable primary key, they survive
+djangocms-versioning version copies untouched.
 
 See Also
 --------
 
-- :doc:`relationships` - How M2M works internally
+- :doc:`relationships` - How relations work internally

@@ -51,10 +51,16 @@ frontend-editing, relationships) so you can focus on your content models, and th
 ---------------
 
 * **Fast setup** — Define models and get instant CMS integration
+  (:doc:`tutorials/basic_setup`)
 * **Multi-language support** — Built-in language/versioning per content model
-* **Generic M2M relations** — Connect to any Django model without hardcoding FKs
-* **Ready-to-use examples** — Contrib modules for common patterns (blog, people, categories)
+  (:doc:`how-to/versioning`)
+* **Generic M2M relations** — Connect groupers to any Django model without
+  hardcoding FKs (:doc:`how-to/m2m_relations`, :doc:`explanation/relationships`)
+* **Ready-to-use examples** — Contrib modules for common patterns
+  (:doc:`blog <how-to/blog>`, :doc:`people <how-to/people>`,
+  :doc:`categories <how-to/categories>`, :doc:`services <how-to/services>`)
 * **Clean architecture** — Simple grouper/content pattern avoiding boilerplate
+  (:doc:`explanation/architecture`)
 * **Django CMS 5.0+** — Compatible with modern django CMS and Django versions
 
 

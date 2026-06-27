@@ -4,7 +4,7 @@ Using the contrib.blog module
 Complete blog system with posts, featured posts, and versioning.
 
 Installation
------------
+------------
 
 .. code-block:: python
 
@@ -20,10 +20,15 @@ Installation
 Models
 ------
 
-**BlogPost** - Groups all language versions of a blog post
-**BlogPostContent** - Language-specific post content (title, body, excerpt)
+**BlogPost** - Groups all language versions of a blog post. Declares two
+grouper-to-grouper relations via :class:`~djangocms_custom_content.relations.RelationField`:
+``authors`` (ordered, to ``people.Person``) and ``categories``
+(to ``categories.FlatCategory``).
 
-Fields: ``title``, ``slug``, ``excerpt``, ``body``, ``is_featured``, ``published_at``
+**BlogPostContent** - Language-specific post content
+
+Content fields: ``title``, ``slug``, ``excerpt``, ``body``, ``is_featured``,
+``published_at``, ``language``
 
 Usage
 -----
@@ -51,9 +56,7 @@ Usage
 Plugins
 -------
 
-- ``BlogPostTeaser`` - Display a single featured post
-- ``LatestBlogPosts`` - Display recent blog posts
-- ``BlogPostList`` - Display all blog posts
+- ``BlogPostTeaserPlugin`` ("Blog post") - Display a single selected post
 
 Admin
 -----
@@ -71,5 +74,6 @@ Features
 See Also
 --------
 
-- :doc:`../tutorials/blog_example` - Complete blog tutorial
-- :doc:`../how-to/m2m_relations` - Add authors using M2M relations
+- :doc:`../how-to/m2m_relations` - How ``authors`` and ``categories`` relations work
+- :doc:`../how-to/people` - The ``Person`` model used as authors
+- :doc:`../how-to/categories` - The ``FlatCategory`` model used as categories

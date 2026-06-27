@@ -20,10 +20,21 @@ Models
 .. autoclass:: djangocms_custom_content.models.CustomContentMixin
    :members:
 
-.. autofunction:: djangocms_custom_content.models.custom_relation_factory
+Relations
+---------
 
-.. autoclass:: djangocms_custom_content.models.GenericM2MManager
+.. autoclass:: djangocms_custom_content.relations.RelationField
    :members:
+
+.. autoclass:: djangocms_custom_content.relations.RelationManager
+   :members:
+
+.. autoclass:: djangocms_custom_content.relations.ReverseRelationManager
+   :members:
+
+.. autofunction:: djangocms_custom_content.relations.relation_through_factory
+
+.. autofunction:: djangocms_custom_content.relations.grouper_model_of
 
 CMS Toolbars
 ------------
@@ -39,7 +50,7 @@ Admin
    :members:
    :show-inheritance:
 
-.. autoclass:: djangocms_custom_content.admin.CustomContentAdminMixin
+.. autoclass:: djangocms_custom_content.relation_admin.RelationAdminMixin
    :members:
    :show-inheritance:
 

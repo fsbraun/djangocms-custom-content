@@ -12,5 +12,4 @@ Deep dives into how djangocms-custom-content works and why.
 This section explains the thinking behind the design and how different components work together.
 
 - **:doc:`architecture`**: High-level system design and component interaction
-- **:doc:`design_patterns`**: Common patterns used throughout the framework
-- **:doc:`relationships`**: How many-to-many relationships work under the hood
+- **:doc:`relationships`**: How grouper-to-grouper relations work under the hood

@@ -110,10 +110,10 @@ Create the article detail template ``my_content/templates/my_content/article_det
     {% block content %}
         {% cms_edit_on %}
         <article class="article">
-            <h1>{{ article.title }}</h1>
-            <p class="meta">Published on {{ article.id }}</p>
+            <h1>{{ object.title }}</h1>
+            <p class="meta">Published on {{ object.id }}</p>
             <div class="content">
-                {{ article.body|safe }}
+                {{ object.body|safe }}
             </div>
         </article>
         {% cms_edit_off %}
@@ -136,9 +136,9 @@ Update ``my_content/models.py``:
         body = models.TextField()
 
         class CMSConfig:
-            # Make editable in frontend and versionable
-            editable = True
-            versionable = True
+            # Make editable in the frontend and versionable
+            enable_frontend_editing = True
+            enable_versioning = True
             # Enable URL routing via app hook
             apphook = True
 
