@@ -102,6 +102,38 @@ The concrete ``source`` foreign key cascades natively on delete. The generic
 dangling rows when a target grouper is deleted. It is cheap: skipped entirely
 unless relation tables exist, and it only runs for grouper instances.
 
+Copying: versioning vs. duplicating a grouper
+---------------------------------------------
+
+Because edges live on the grouper, there are two distinct cases — and only one of
+them needs your attention:
+
+- **Creating a new version** (djangocms-versioning copies the *content* row): the
+  grouper keeps its primary key, so the edges are untouched and the new version
+  sees the same relations. Nothing to do — this is the point of anchoring to the
+  grouper.
+- **Duplicating the grouper itself** (a hand-rolled "duplicate this object"
+  action that creates a *new* grouper): edges are **not** copied automatically,
+  exactly as a Django ``ManyToManyField`` is not copied when you save an instance
+  with ``pk=None``. Copy them explicitly:
+
+  .. code-block:: python
+
+      from djangocms_custom_content.relations import iter_relation_fields
+
+      for name, _field in iter_relation_fields(type(source_grouper)):
+          getattr(new_grouper, name).set(getattr(source_grouper, name).all())
+
+  ``.set()`` re-adds in queryset order, so ``ordered=True`` relations keep their
+  positions.
+
+  Copying edges is only half of it: a fresh grouper has **no content**, since the
+  editable data lives in the content rows, not the grouper. A complete "duplicate
+  this object" also re-creates the relevant content object(s) — typically one per
+  language, or a new draft version — pointing their grouper foreign key at
+  ``new_grouper`` before (or after) you copy the relations. How many content rows
+  to copy is app-specific, so the framework leaves it to you.
+
 See Also
 --------
 

@@ -146,6 +146,26 @@ The concrete source foreign key cascades natively. The generic target has no
 database constraint, so when a target grouper is deleted the framework sweeps
 its dangling relation rows automatically.
 
+Copying
+-------
+
+Edges are anchored to the grouper, so **creating a new version copies nothing** —
+the new version sees the same relations. They are only not carried over when you
+**duplicate the grouper itself** (just like a Django ``ManyToManyField``); copy
+them explicitly in that case:
+
+.. code-block:: python
+
+    from djangocms_custom_content.relations import iter_relation_fields
+
+    for name, _field in iter_relation_fields(type(source_grouper)):
+        getattr(new_grouper, name).set(getattr(source_grouper, name).all())
+
+A full duplicate usually also re-creates the grouper's **content** object(s)
+(pointed at ``new_grouper``) — a brand-new grouper has no content of its own.
+
+See :doc:`../explanation/relationships` for the full rationale.
+
 See Also
 --------
 
