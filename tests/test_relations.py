@@ -105,6 +105,10 @@ class ForwardAccessorTests(RelationTestBase):
         self.assertIsInstance(filtered, QuerySet)
         self.assertEqual(list(filtered), [self.ann])
 
+    def test_iteration(self):
+        self.post.authors.add(self.ann, self.bob)
+        self.assertEqual(set(iter(self.post.authors)), {self.ann, self.bob})
+
     def test_accepts_content_object_and_stores_grouper(self):
         ann_content = PersonContent.admin_manager.filter(person=self.ann).first()
         self.post.authors.add(ann_content)  # pass content, not grouper
@@ -146,6 +150,52 @@ class ReverseAccessorTests(RelationTestBase):
         self.post1.authors.add(self.ann)
         self.assertIsInstance(self.ann.authored_posts.all(), QuerySet)
 
+    def test_reverse_filter_chains_onto_real_queryset(self):
+        self.post1.authors.add(self.ann)
+        self.post2.authors.add(self.ann)
+        filtered = self.ann.authored_posts.filter(pk=self.post1.pk)
+        self.assertIsInstance(filtered, QuerySet)
+        self.assertEqual(list(filtered), [self.post1])
+
+    def test_reverse_count_and_exists(self):
+        self.assertFalse(self.ann.authored_posts.exists())
+        self.assertEqual(self.ann.authored_posts.count(), 0)
+        self.post1.authors.add(self.ann)
+        self.post2.authors.add(self.ann)
+        self.assertTrue(self.ann.authored_posts.exists())
+        self.assertEqual(self.ann.authored_posts.count(), 2)
+
+    def test_reverse_iteration(self):
+        self.post1.authors.add(self.ann)
+        self.post2.authors.add(self.ann)
+        self.assertEqual(set(iter(self.ann.authored_posts)), {self.post1, self.post2})
+
+    def test_reverse_add(self):
+        self.ann.authored_posts.add(self.post1, self.post2)
+        # Reverse add is symmetric with forward add: the edge resolves both ways.
+        self.assertEqual(set(self.ann.authored_posts.all()), {self.post1, self.post2})
+        self.assertEqual(set(self.post1.authors.all()), {self.ann})
+
+    def test_reverse_add_is_idempotent(self):
+        self.ann.authored_posts.add(self.post1)
+        self.ann.authored_posts.add(self.post1)
+        self.assertEqual(self.ann.authored_posts.count(), 1)
+
+    def test_reverse_add_accepts_content_object_and_stores_grouper(self):
+        post1_content = BlogPostContent.admin_manager.filter(post=self.post1).first()
+        self.ann.authored_posts.add(post1_content)  # pass content, not grouper
+        self.assertEqual(set(self.ann.authored_posts.all()), {self.post1})
+
+    def test_reverse_remove(self):
+        self.ann.authored_posts.add(self.post1, self.post2)
+        self.ann.authored_posts.remove(self.post1)
+        self.assertEqual(set(self.ann.authored_posts.all()), {self.post2})
+
+    def test_reverse_clear(self):
+        self.ann.authored_posts.add(self.post1, self.post2)
+        self.ann.authored_posts.clear()
+        self.assertFalse(self.ann.authored_posts.exists())
+
 
 class CascadeTests(RelationTestBase):
     def test_deleting_source_cascades_natively(self):
@@ -185,6 +235,12 @@ class CategoriesRelationTests(RelationTestBase):
     def test_target_is_the_content_model_when_no_grouper(self):
         # FlatCategory has no grouper, so the relation targets FlatCategory itself.
         self.assertIs(grouper_model_of(FlatCategory), FlatCategory)
+
+    def test_reorder_requires_ordered_relation(self):
+        # ``categories`` is unordered, so reorder() must refuse rather than no-op.
+        self.post.categories.add(self.news, self.tech)
+        with self.assertRaises(TypeError):
+            self.post.categories.reorder([self.tech, self.news])
 
 
 class VersionCopySurvivalTests(RelationTestBase):

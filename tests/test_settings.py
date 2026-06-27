@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "djangocms_custom_content.contrib.blog",
     "djangocms_custom_content.contrib.people",
     "djangocms_custom_content.contrib.categories",
+    "djangocms_custom_content.contrib.services",
     "tests.test_app",
 ]
 
