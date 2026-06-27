@@ -9,7 +9,7 @@ These tutorials build upon each other progressively. Start with the first tutori
 2. **CMS Plugins and App Hooks** - Extend your article model by adding CMS plugins and enabling URL routing via an app hook
 3. **Adding relations between models** - Add many-to-many relations by creating a Person model and linking authors to articles
 
-Each tutorial adds new functionality to the same article concept. You can follow them sequentially to build a complete, feature-rich content management system.
+Each tutorial adds new functionality to the same article concept, so follow them in order.
 
 .. toctree::
    :maxdepth: 1

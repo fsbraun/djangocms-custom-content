@@ -4,7 +4,7 @@ Using the contrib.blog module
 Complete blog system with posts, featured posts, and versioning.
 
 Installation
------------
+------------
 
 .. code-block:: python
 
@@ -20,10 +20,15 @@ Installation
 Models
 ------
 
-**BlogPost** - Groups all language versions of a blog post
-**BlogPostContent** - Language-specific post content (title, body, excerpt)
+**BlogPost** - Groups all language versions of a blog post. Declares two
+grouper-to-grouper relations via :class:`~djangocms_custom_content.relations.RelationField`:
+``authors`` (ordered, to ``people.Person``) and ``categories``
+(to ``categories.FlatCategory``).
 
-Fields: ``title``, ``slug``, ``excerpt``, ``body``, ``is_featured``, ``published_at``
+**BlogPostContent** - Language-specific post content
+
+Content fields: ``title``, ``slug``, ``excerpt``, ``body``, ``is_featured``,
+``published_at``, ``language``
 
 Usage
 -----
@@ -51,25 +56,26 @@ Usage
 Plugins
 -------
 
-- ``BlogPostTeaser`` - Display a single featured post
-- ``LatestBlogPosts`` - Display recent blog posts
-- ``BlogPostList`` - Display all blog posts
+- ``BlogPostTeaserPlugin`` ("Blog post") - Display a single selected post
 
 Admin
 -----
 
-Registered with list display, filters, and search by title/slug.
+``BlogPostAdmin`` is a ``GrouperModelAdmin`` (see :doc:`admin`) with
+``content__``-prefixed list display and search, and it renders the ``authors``
+and ``categories`` relations as autocomplete widgets.
 
-Features
---------
+What this app demonstrates
+--------------------------
 
-- Multi-language support
-- Featured post highlighting
-- Publication date tracking
-- Admin-friendly interface
+The blog is the reference example for the relations system: it declares **both**
+an *ordered* relation (``authors`` → ``Person``, drag-sortable in the admin) and
+an *unordered* one (``categories`` → ``FlatCategory``), on a content model that
+is **per-language versioned** (it has a ``language`` field) and frontend-editable.
 
 See Also
 --------
 
-- :doc:`../tutorials/blog_example` - Complete blog tutorial
-- :doc:`../how-to/m2m_relations` - Add authors using M2M relations
+- :doc:`../how-to/m2m_relations` - How ``authors`` and ``categories`` relations work
+- :doc:`../how-to/people` - The ``Person`` model used as authors
+- :doc:`../how-to/categories` - The ``FlatCategory`` model used as categories

@@ -1,10 +1,11 @@
 Using the contrib.categories module
 ===================================
 
-Flexible category system for organizing content using the ``relate_to`` configuration.
+Flexible category system for organizing content, used as a target of a
+:class:`~djangocms_custom_content.relations.RelationField`.
 
 Installation
------------
+------------
 
 .. code-block:: python
 
@@ -24,12 +25,18 @@ Models
 
 Fields: ``title``, ``slug``, ``is_featured``
 
-The ``FlatCategory`` model uses the ``relate_to`` configuration to automatically add a ``categories`` accessor to ``BlogPost``:
+``FlatCategory`` itself declares no relations. Instead, ``BlogPost`` (the
+grouper) opts in by declaring a ``RelationField`` that targets ``FlatCategory``
+and invites a reverse ``blog_posts`` accessor onto it (see
+``contrib/blog/models.py``):
 
 .. code-block:: python
 
-    class CMSConfig:
-        relate_to = [("categories", "djangocms_custom_content_blog.BlogPost")]
+    class BlogPost(AbstractCustomGrouper):
+        categories = RelationField(
+            "djangocms_custom_content_categories.FlatCategory",
+            related_name="blog_posts",
+        )
 
 Usage
 -----
@@ -66,15 +73,32 @@ Link categories to blog posts:
     # Clear all categories
     blog_post.categories.clear()
 
+The reverse accessor invited by ``related_name="blog_posts"`` lets you go the
+other way without ``FlatCategory`` declaring anything:
+
+.. code-block:: python
+
+    category = FlatCategory.objects.first()
+    category.blog_posts.all()  # BlogPost groupers in this category
+
 Plugins
 -------
 
-- ``FlatCategoryList`` - Display all categories
+- ``CategoryListPlugin`` ("Category list", model ``FlatCategoryList``) -
+  Display categories, optionally featured-only and limited
 
 Admin
 -----
 
-``FlatCategory`` is registered with search by title and slug.
+``FlatCategory`` has **no grouper**, so it is registered with a plain
+``admin.ModelAdmin`` (search by title and slug) — not the grouper admin.
+
+What this app demonstrates
+--------------------------
+
+``FlatCategory`` is a **grouper-less content model used as a relation target**:
+it opts out of versioning and app hooks, yet ``BlogPost`` can still relate to it
+and gets a ``blog_posts`` reverse accessor on it for free.
 
 In Templates
 ~~~~~~~~~~~~
@@ -98,5 +122,5 @@ In Templates
 See Also
 --------
 
-- :doc:`../how-to/m2m_relations` - Learn about ``relate_to`` and ``invite_m2m_relations``
-- :doc:`../explanation/relationships` - How M2M relations work
+- :doc:`../how-to/m2m_relations` - Declaring ``RelationField`` relations
+- :doc:`../explanation/relationships` - How grouper relations work

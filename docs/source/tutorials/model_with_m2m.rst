@@ -1,18 +1,24 @@
 Model with M2M Relations
 ========================
 
-Learn how to create flexible many-to-many relationships between your content models.
+Learn how to create flexible many-to-many relationships between your content
+models.
 
 This tutorial builds on the :doc:`article_with_plugins` tutorial.
 
 Overview
 --------
 
-We'll add authors to our articles using the ``invite_m2m_relations`` feature:
+We'll add authors to our articles using a
+:class:`~djangocms_custom_content.relations.RelationField`:
 
-- Create a ``Person`` model to represent authors
-- Link ``Person`` objects to articles using generic M2M relations
+- Create a ``Person`` grouper/content pair to represent authors
+- Declare an ``authors`` relation on the ``Article`` grouper
 - Display authors on article pages
+
+The key idea: relations are declared on the **grouper** (``Article``), target
+another **grouper** (``Person``), and are anchored to stable primary keys so
+they survive versioning.
 
 Step 1: Create the Person Model
 --------------------------------
@@ -25,7 +31,6 @@ Add to ``my_content/models.py``:
     from djangocms_custom_content.models import (
         AbstractCustomGrouper,
         AbstractCustomContent,
-        custom_relation_factory,
     )
 
     # Existing Article and ArticleContent models...
@@ -55,59 +60,59 @@ Add to ``my_content/models.py``:
         def __str__(self):
             return self.full_name
 
-    # THIS IS REQUIRED for invite_m2m_relations to work
-    # Note: Create relation factory for the Grouper (Person), not Content model
-    PersonRelation = custom_relation_factory(Person)
+Step 2: Declare the authors relation on Article
+------------------------------------------------
 
-Step 2: Configure ArticleContent for M2M
-------------------------------------------
-
-Update the ``ArticleContent`` model in ``my_content/models.py`` to point to Person:
+Add a ``RelationField`` to the ``Article`` **grouper** (not ``ArticleContent``).
+The relation targets ``Person`` and invites a reverse ``authored_articles``
+accessor onto it:
 
 .. code-block:: python
 
-    class ArticleContent(AbstractCustomContent):
-        """The editable article content."""
-        article = models.ForeignKey(Article, on_delete=models.CASCADE)
-        title = models.CharField(max_length=200)
-        slug = models.SlugField()
-        body = models.TextField()
+    from djangocms_custom_content.relations import RelationField
 
-        class CMSConfig:
-            editable = True
-            versionable = True
-            apphook = True
-            # Request authors from the Person model
-            invite_m2m_relations = [("authors", "my_content.Person")]
+    class Article(AbstractCustomGrouper):
+        """Groups all language versions of an article."""
+        authors = RelationField(
+            "my_content.Person",
+            related_name="authored_articles",
+            ordered=True,
+        )
 
-        def __str__(self):
-            return self.title
-
-        def __str__(self):
-            return self.title
+``ordered=True`` keeps authors in a stored order and enables ``reorder()``.
+``ArticleContent`` is unchanged from the previous tutorials.
 
 Step 3: Register Person with Admin
 -----------------------------------
 
 Add to ``my_content/admin.py``:
 
+``Person`` is a grouper, so register it with the grouper admin pattern (see
+:doc:`../how-to/admin`). For the ``authors`` autocomplete on the ``Article``
+admin to find people, ``PersonAdmin`` must define ``search_fields``:
+
 .. code-block:: python
 
+    from cms.admin.utils import GrouperModelAdmin
+    from django.contrib import admin
+
+    from djangocms_custom_content.admin import CustomGrouperAdminMixin
     from .models import Person, PersonContent
 
     @admin.register(Person)
-    class PersonAdmin(admin.ModelAdmin):
-        list_display = ("id",)
-
-    @admin.register(PersonContent)
-    class PersonContentAdmin(admin.ModelAdmin):
-        list_display = ("full_name", "email")
+    class PersonAdmin(CustomGrouperAdminMixin, GrouperModelAdmin):
+        content_model = PersonContent
+        list_display = ("content__full_name", "content__email")
+        search_fields = ("content__full_name", "content__email")
 
 Step 4: Update Article Detail Template with Authors
 ----------------------------------------------------
 
-Update ``my_content/templates/my_content/article_detail.html`` to display authors.
-The generic detail view automatically provides the article object and you can access authors via the ``invite_m2m_relations`` accessor:
+The generic detail view renders an ``ArticleContent`` object, available in the
+template under its model name, ``articlecontent`` (see :doc:`../how-to/apphooks`).
+Reach its grouper through the ``article`` foreign key, then the ``authors``
+relation. Each related ``Person`` is a grouper, so read its profile via
+``get_admin_content``:
 
 .. code-block:: django
 
@@ -117,36 +122,40 @@ The generic detail view automatically provides the article object and you can ac
     {% block content %}
         {% cms_edit_on %}
         <article class="article">
-            <h1>{{ article.title }}</h1>
+            <h1>{{ articlecontent.title }}</h1>
 
-            {% if article.authors.all %}
-                <div class="authors">
-                    <h3>Authors</h3>
-                    <ul class="author-list">
-                        {% for author in article.authors.all %}
-                            <li class="author">
-                                {% if author.avatar %}
-                                    <img src="{{ author.avatar.url }}"
-                                         alt="{{ author.full_name }}"
-                                         class="author-avatar">
-                                {% endif %}
-                                <div class="author-info">
-                                    <strong>{{ author.full_name }}</strong>
-                                    {% if author.bio %}
-                                        <p class="bio">{{ author.bio }}</p>
-                                    {% endif %}
-                                    {% if author.email %}
-                                        <p><a href="mailto:{{ author.email }}">{{ author.email }}</a></p>
-                                    {% endif %}
-                                </div>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            {% endif %}
+            {% with authors=articlecontent.article.authors.all %}
+                {% if authors %}
+                    <div class="authors">
+                        <h3>Authors</h3>
+                        <ul class="author-list">
+                            {% for person in authors %}
+                                {% with profile=person.get_admin_content %}
+                                    <li class="author">
+                                        {% if profile.avatar %}
+                                            <img src="{{ profile.avatar.url }}"
+                                                 alt="{{ profile.full_name }}"
+                                                 class="author-avatar">
+                                        {% endif %}
+                                        <div class="author-info">
+                                            <strong>{{ profile.full_name }}</strong>
+                                            {% if profile.bio %}
+                                                <p class="bio">{{ profile.bio }}</p>
+                                            {% endif %}
+                                            {% if profile.email %}
+                                                <p><a href="mailto:{{ profile.email }}">{{ profile.email }}</a></p>
+                                            {% endif %}
+                                        </div>
+                                    </li>
+                                {% endwith %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            {% endwith %}
 
             <div class="content">
-                {{ article.body|safe }}
+                {{ articlecontent.body|safe }}
             </div>
         </article>
         {% cms_edit_off %}
@@ -167,16 +176,19 @@ Via Django shell:
 
 .. code-block:: python
 
-    from my_content.models import ArticleContent, Person
+    from my_content.models import Article, Person
 
-    article = ArticleContent.objects.first()
+    article = Article.objects.first()   # the grouper
     person = Person.objects.first()
 
-    # Add an author to the article
+    # Add an author (accepts a Person grouper or a PersonContent)
     article.authors.add(person)
 
     # Get all authors of an article
     all_authors = article.authors.all()
+
+    # Set an explicit order (relation is ordered)
+    article.authors.reorder([person])
 
     # Remove an author
     article.authors.remove(person)
@@ -186,40 +198,37 @@ Via Django shell:
 
 Via Django admin:
 
-1. Edit an ``ArticleContent`` object
-2. Use the ``authors`` accessor to add/remove Person objects
+1. Edit an ``Article`` object (the grouper)
+2. Use the ``authors`` autocomplete field to add/remove Person objects
 3. Save
 
 Key Concepts
------------
+------------
 
-**invite_m2m_relations**
+**RelationField**
 
-The ``invite_m2m_relations`` configuration tells ArticleContent:
+Declaring ``authors = RelationField("my_content.Person", ...)`` on ``Article``:
 
-- "I want to link to Person objects"
-- "Please add an ``authors`` accessor to my instances"
-- "Use a generic through model to handle the relationship"
-
-This creates a bidirectional relationship:
+- Creates a dedicated through table anchored to grouper primary keys
+- Installs a forward ``authors`` accessor on ``Article``
+- Installs a reverse ``authored_articles`` accessor on ``Person`` (because of
+  ``related_name``) — ``Person`` declares nothing itself
 
 .. code-block:: python
 
-    # From ArticleContent side:
-    article.authors.all()  # Get authors of this article
+    article.authors.all()        # Person groupers for this article
+    person.authored_articles.all()  # Article groupers by this person
 
-    # There's no direct reverse accessor on Person
-    # (it doesn't know about articles)
+**Why the grouper?**
 
-**Generic M2M Benefits**
-
-- One Person can be linked to many ArticleContent instances
-- The same Person model can be linked to other content types without modification
-- The through model (PersonRelation) is shared across all relations
+- One Person can be linked to many Articles, and vice versa
+- The same Person grouper can be targeted by other content types too
+- Because edges store grouper primary keys, they survive version copies
 
 Next Steps
 ----------
 
-- Learn more about :doc:`../how-to/m2m_relations` and the difference between ``relate_to`` and ``invite_m2m_relations``
-- Explore :doc:`../explanation/relationships` to understand how generic M2M relations work under the hood
-- Check :doc:`../reference/index` for complete API reference
+- Learn more in the :doc:`../how-to/m2m_relations` how-to guide
+- Explore :doc:`../explanation/relationships` to understand how relations work
+  under the hood
+- Check :doc:`../reference/index` for the complete API reference
