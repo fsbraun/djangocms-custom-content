@@ -69,7 +69,7 @@ The exact configuration depends on your project and the content types you build.
 To learn how to build your own model-based content types with this framework, see the
 documentation section "Creating custom models":
 
-https://not-yet-there.readthedocs.io/
+https://djangocms-custom-content.readthedocs.io/
 
 Contrib examples
 ================
