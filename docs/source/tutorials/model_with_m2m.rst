@@ -87,25 +87,32 @@ Step 3: Register Person with Admin
 
 Add to ``my_content/admin.py``:
 
+``Person`` is a grouper, so register it with the grouper admin pattern (see
+:doc:`../how-to/admin`). For the ``authors`` autocomplete on the ``Article``
+admin to find people, ``PersonAdmin`` must define ``search_fields``:
+
 .. code-block:: python
 
+    from cms.admin.utils import GrouperModelAdmin
+    from django.contrib import admin
+
+    from djangocms_custom_content.admin import CustomGrouperAdminMixin
     from .models import Person, PersonContent
 
     @admin.register(Person)
-    class PersonAdmin(admin.ModelAdmin):
-        list_display = ("id",)
-
-    @admin.register(PersonContent)
-    class PersonContentAdmin(admin.ModelAdmin):
-        list_display = ("full_name", "email")
+    class PersonAdmin(CustomGrouperAdminMixin, GrouperModelAdmin):
+        content_model = PersonContent
+        list_display = ("content__full_name", "content__email")
+        search_fields = ("content__full_name", "content__email")
 
 Step 4: Update Article Detail Template with Authors
 ----------------------------------------------------
 
-The generic detail view renders an ``ArticleContent`` object (available in the
-template as ``object``). Reach its grouper through the ``article`` foreign key,
-then the ``authors`` relation. Each related ``Person`` is a grouper, so read its
-profile via ``get_admin_content``:
+The generic detail view renders an ``ArticleContent`` object, available in the
+template under its model name, ``articlecontent`` (see :doc:`../how-to/apphooks`).
+Reach its grouper through the ``article`` foreign key, then the ``authors``
+relation. Each related ``Person`` is a grouper, so read its profile via
+``get_admin_content``:
 
 .. code-block:: django
 
@@ -115,9 +122,9 @@ profile via ``get_admin_content``:
     {% block content %}
         {% cms_edit_on %}
         <article class="article">
-            <h1>{{ object.title }}</h1>
+            <h1>{{ articlecontent.title }}</h1>
 
-            {% with authors=object.article.authors.all %}
+            {% with authors=articlecontent.article.authors.all %}
                 {% if authors %}
                     <div class="authors">
                         <h3>Authors</h3>
@@ -148,7 +155,7 @@ profile via ``get_admin_content``:
             {% endwith %}
 
             <div class="content">
-                {{ object.body|safe }}
+                {{ articlecontent.body|safe }}
             </div>
         </article>
         {% cms_edit_off %}

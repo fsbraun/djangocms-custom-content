@@ -61,15 +61,17 @@ Plugins
 Admin
 -----
 
-Registered with list display, filters, and search by title/slug.
+``BlogPostAdmin`` is a ``GrouperModelAdmin`` (see :doc:`admin`) with
+``content__``-prefixed list display and search, and it renders the ``authors``
+and ``categories`` relations as autocomplete widgets.
 
-Features
---------
+What this app demonstrates
+--------------------------
 
-- Multi-language support
-- Featured post highlighting
-- Publication date tracking
-- Admin-friendly interface
+The blog is the reference example for the relations system: it declares **both**
+an *ordered* relation (``authors`` → ``Person``, drag-sortable in the admin) and
+an *unordered* one (``categories`` → ``FlatCategory``), on a content model that
+is **per-language versioned** (it has a ``language`` field) and frontend-editable.
 
 See Also
 --------

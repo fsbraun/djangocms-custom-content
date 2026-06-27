@@ -73,9 +73,9 @@ Create ``my_content/templates/my_content/article_teaser.html``:
         <div class="articles-grid">
             {% for article in articles %}
                 <article class="article-card">
-                    <h3><a href="{% url 'article-detail' article.slug %}">{{ article.title }}</a></h3>
+                    <h3><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h3>
                     <p>{{ article.body|truncatewords:30 }}</p>
-                    <a href="{% url 'article-detail' article.slug %}" class="btn">Read more</a>
+                    <a href="{{ article.get_absolute_url }}" class="btn">Read more</a>
                 </article>
             {% empty %}
                 <p>No articles yet.</p>
@@ -92,7 +92,7 @@ Create ``my_content/templates/my_content/article_list.html``:
         <ul class="articles">
             {% for article in articles %}
                 <li>
-                    <a href="{% url 'article-detail' article.slug %}">{{ article.title }}</a>
+                    <a href="{{ article.get_absolute_url }}">{{ article.title }}</a>
                 </li>
             {% empty %}
                 <p>No articles available.</p>
@@ -100,7 +100,11 @@ Create ``my_content/templates/my_content/article_list.html``:
         </ul>
     </section>
 
-Create the article detail template ``my_content/templates/my_content/article_detail.html``:
+Create the detail template. By convention it is named
+``<app_label>/<modelname>_detail.html``, and the content object is available
+under its model name (``articlecontent``) in both the app-hook view and the
+frontend editor — so create
+``my_content/templates/my_content/articlecontent_detail.html``:
 
 .. code-block:: django
 
@@ -110,14 +114,17 @@ Create the article detail template ``my_content/templates/my_content/article_det
     {% block content %}
         {% cms_edit_on %}
         <article class="article">
-            <h1>{{ object.title }}</h1>
-            <p class="meta">Published on {{ object.id }}</p>
+            <h1>{{ articlecontent.title }}</h1>
+            <p class="meta">Published on {{ articlecontent.id }}</p>
             <div class="content">
-                {{ object.body|safe }}
+                {{ articlecontent.body|safe }}
             </div>
         </article>
         {% cms_edit_off %}
     {% endblock %}
+
+See :doc:`../how-to/apphooks` for the full template contract (why
+``articlecontent`` rather than ``object``).
 
 Step 3: Enable App Hook
 -----------------------

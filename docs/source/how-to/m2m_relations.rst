@@ -1,10 +1,20 @@
 Set Up Many-to-Many Relations
 =============================
 
-djangocms-custom-content provides a single, declarative way to relate content to
-other content: the :class:`~djangocms_custom_content.relations.RelationField`.
-You declare it on a **grouper** model and it reads like Django's
-``ManyToManyField``.
+Relating content to content takes one line. Add a
+:class:`~djangocms_custom_content.relations.RelationField` to a **grouper** model
+— it reads just like Django's ``ManyToManyField``:
+
+.. code-block:: python
+
+    from djangocms_custom_content.relations import RelationField
+
+    class BlogPost(AbstractCustomGrouper):
+        authors = RelationField("people.Person", related_name="authored_posts", ordered=True)
+
+Run ``makemigrations`` and you're done — ``post.authors.add(person)`` and
+``person.authored_posts.all()`` both work, and the admin renders ``authors`` as a
+sortable autocomplete. The rest of this guide unpacks the options.
 
 Why a custom field?
 -------------------

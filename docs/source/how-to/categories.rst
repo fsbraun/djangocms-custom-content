@@ -90,7 +90,15 @@ Plugins
 Admin
 -----
 
-``FlatCategory`` is registered with search by title and slug.
+``FlatCategory`` has **no grouper**, so it is registered with a plain
+``admin.ModelAdmin`` (search by title and slug) — not the grouper admin.
+
+What this app demonstrates
+--------------------------
+
+``FlatCategory`` is a **grouper-less content model used as a relation target**:
+it opts out of versioning and app hooks, yet ``BlogPost`` can still relate to it
+and gets a ``blog_posts`` reverse accessor on it for free.
 
 In Templates
 ~~~~~~~~~~~~

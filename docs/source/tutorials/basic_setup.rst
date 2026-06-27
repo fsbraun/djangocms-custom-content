@@ -3,6 +3,10 @@ Installation and Example
 
 Install djangocms-custom-content and create your first editable, versionable content model.
 
+By the end you'll have a working ``Article`` model that is editable in the django
+CMS frontend, versioned per language, and manageable in the admin — written in
+about a dozen lines.
+
 Prerequisites
 -------------
 
@@ -95,20 +99,31 @@ The ``CMSConfig`` class enables:
 Step 5: Register with Admin
 ----------------------------
 
+Register the **grouper** with django CMS's ``GrouperModelAdmin`` and
+:class:`~djangocms_custom_content.admin.CustomGrouperAdminMixin`. Content is
+edited *through* this admin, so you do not register ``ArticleContent`` yourself.
+Reach content fields with the ``content__`` prefix.
+
 Create ``my_content/admin.py``:
 
 .. code-block:: python
 
+    from cms.admin.placeholderadmin import FrontendEditableAdminMixin
+    from cms.admin.utils import GrouperModelAdmin
     from django.contrib import admin
-    from .models import Article, ArticleContent
+
+    from djangocms_custom_content.admin import CustomGrouperAdminMixin
+    from .models import Article
 
     @admin.register(Article)
-    class ArticleAdmin(admin.ModelAdmin):
-        pass
+    class ArticleAdmin(CustomGrouperAdminMixin, FrontendEditableAdminMixin, GrouperModelAdmin):
+        grouper_field_name = "article"   # the FK on ArticleContent
 
-    @admin.register(ArticleContent)
-    class ArticleContentAdmin(admin.ModelAdmin):
-        list_display = ("title", "language", "article")
+        list_display = ("content__title", "content__slug")
+        search_fields = ("content__title", "content__body")
+        prepopulated_fields = {"content__slug": ("content__title",)}
+
+See :doc:`../how-to/admin` for the full explanation of this pattern.
 
 Step 6: Run Migrations
 ----------------------

@@ -91,7 +91,15 @@ Plugins
 Admin
 -----
 
-Registered in Django admin as a grouper admin.
+``PersonAdmin`` is a ``GrouperModelAdmin`` (see :doc:`admin`) using
+``content_model = PersonContent``.
+
+What this app demonstrates
+--------------------------
+
+``Person`` is a **versioned grouper without a** ``language`` **field** — proof
+that versioning does not require multi-language content. It is also the canonical
+*target* of a relation (``BlogPost.authors``).
 
 See Also
 --------

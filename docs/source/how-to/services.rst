@@ -52,9 +52,17 @@ Plugins
 Admin
 -----
 
-Registered with standard display and search.
+Registered with a plain ``admin.ModelAdmin`` (standard display and search).
+
+What this app demonstrates
+--------------------------
+
+``Service`` is a **plain Django model** — not a grouper/content pair and not
+versioned. It shows that the CMS plugins (teaser, featured list) work against an
+ordinary model, with no framework base class required.
 
 See Also
 --------
 
+- :doc:`admin` - When to use the grouper admin versus a plain admin
 - :doc:`../reference/index` - API reference

@@ -4,6 +4,13 @@ Architecture
 Core Design: Grouper + Content Pattern
 --------------------------------------
 
+This framework adopts django CMS's own **content object** pattern. In short, an
+editable item is split into a *grouper* (stable identity) and one or more
+*content* rows (the editable, per-language, versioned state); foreign keys point
+at the grouper so they survive translations and version copies. For the full
+rationale, see the upstream explanation,
+`Content objects <https://docs.django-cms.org/en/latest/explanation/content_objects.html>`_.
+
 djangocms-custom-content uses a two-model pattern:
 
 **Grouper** - One per item (e.g., Article)
@@ -18,10 +25,16 @@ djangocms-custom-content uses a two-model pattern:
 
 Why This Design?
 
-- **Multilingual by default** - Add language by creating new Content object
-- **Version history** - Old Content objects remain in database
-- **Clean separation** - Grouper is identity, Content is presentation
-- **Efficient** - One query per language
+- **Multilingual by default** - Each language is a Content row pointing at the
+  same grouper.
+- **Version history** - Versioning copies the Content row (new primary key);
+  the grouper is untouched.
+- **Stable references** - Because foreign keys and
+  :class:`~djangocms_custom_content.relations.RelationField` relations target the
+  *grouper*, not a Content row, they survive translations and version copies.
+- **Cheap reads** - ``get_content()`` issues a single query and caches every
+  language of the grouper, so subsequent language lookups hit the cache rather
+  than the database.
 
 Example:
 
@@ -44,6 +57,68 @@ Example:
         title="German Title",
         body="German content..."
     )
+
+Reading content: ``get_content`` vs ``get_admin_content``
+---------------------------------------------------------
+
+A grouper exposes two accessors, and the difference matters when versioning is
+enabled:
+
+- :meth:`~djangocms_custom_content.models.AbstractCustomGrouper.get_content` -
+  the **published** content for a language (defaults to the current language).
+  This is what you use in public templates.
+- :meth:`~djangocms_custom_content.models.AbstractCustomGrouper.get_admin_content` -
+  the **latest** content, including drafts, optimised for admin listings.
+
+.. code-block:: python
+
+    article.get_content(language="en")        # published — for the site
+    article.get_admin_content(language="en")  # latest draft — for the admin
+
+Because relation accessors return *groupers* (e.g. ``post.authors.all()`` yields
+``Person`` groupers), reach their displayable fields through one of these
+accessors: ``person.get_admin_content().name``.
+
+Rendering: template defaults
+----------------------------
+
+Content models render without any wiring, thanks to a naming convention. By
+default a content object looks for:
+
+.. code-block:: text
+
+    <app_label>/<modelname>_detail.html
+
+So ``ArticleContent`` in an app called ``my_content`` renders from
+``my_content/articlecontent_detail.html``, and the object is available in that
+template under its **model name** (``articlecontent``). The ``_detail`` part is
+:attr:`~djangocms_custom_content.models.AbstractCustomContent.template_name_suffix`,
+and the same default serves both the app-hook detail view and the frontend
+editor — one template covers both.
+
+Need a different template? Override
+:meth:`~djangocms_custom_content.models.AbstractCustomContent.get_template` (the
+bundled blog returns ``"blog/detail.html"``):
+
+.. code-block:: python
+
+    class ArticleContent(AbstractCustomContent):
+        def get_template(self):
+            return "my_content/article.html"
+
+The :doc:`../how-to/apphooks` guide spells out the full contract — which context
+variables each render path provides, and how an override interacts with the
+app-hook view.
+
+Not everything needs a grouper
+------------------------------
+
+A content model becomes part of a grouper/content pair only when it declares a
+foreign key to an :class:`~djangocms_custom_content.models.AbstractCustomGrouper`.
+Skip that foreign key and you get a simpler, perfectly valid shape — like the
+bundled ``FlatCategory`` — that opts out of versioning, app hooks and the grouper
+admin, yet can still be used as a relation target. Start simple; add a grouper
+only when you actually need versions or languages.
 
 Relations Are Grouper-Anchored
 ------------------------------
