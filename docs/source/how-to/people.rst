@@ -4,7 +4,7 @@ Using the contrib.people module
 Manage people/authors and link them to content via M2M relations.
 
 Installation
------------
+------------
 
 .. code-block:: python
 
@@ -20,8 +20,11 @@ Installation
 Models
 ------
 
-**Person** - Groups all language versions of a person
-**PersonContent** - Language-specific person information (name, bio, etc.)
+**Person** - The grouper. Optionally linked to a ``User`` via a one-to-one field.
+**PersonContent** - The versioned content holding the person's details
+
+Content fields: ``name``, ``slug``, ``role``, ``description``, ``phone``,
+``mobile``, ``fax``, ``email``, ``website``, ``visual`` (a Filer image).
 
 Usage
 -----
@@ -35,46 +38,68 @@ Creating people:
     person = Person.objects.create()
     PersonContent.objects.create(
         person=person,
-        language="en",
-        first_name="John",
-        last_name="Doe",
-        bio="Author bio...",
+        slug="john-doe",
+        name="John Doe",
+        role="Author",
+        description="Author bio...",
     )
 
-Linking to content:
+Linking people as authors:
+
+People are linked through a ``RelationField`` declared on the *grouper* that
+wants authors. The bundled blog does exactly this on ``BlogPost`` (see
+``contrib/blog/models.py``):
 
 .. code-block:: python
 
-    # In your BlogPost model
-    class CMSConfig:
-        m2m_relations = [("authors", "blog.BlogPost")]
+    class BlogPost(AbstractCustomGrouper):
+        authors = RelationField(
+            "djangocms_custom_content_people.Person",
+            related_name="authored_posts",
+            ordered=True,
+        )
 
-    # Use it
+.. code-block:: python
+
     blog_post = BlogPost.objects.first()
-    blog_post.authors.all()  # Get all authors
-    blog_post.authors.add(person_content)
+    blog_post.authors.add(person)   # accepts a Person grouper or PersonContent
+    blog_post.authors.all()         # Person groupers, in their stored order
 
-In templates:
+    # Reverse accessor invited by related_name:
+    person.authored_posts.all()     # BlogPost groupers authored by this person
+
+In templates (``authors.all`` yields ``Person`` groupers, so reach the content
+via ``get_admin_content``):
 
 .. code-block:: django
 
-    {% for person in article.authors.all %}
-        <div class="author">
-            <h4>{{ person.first_name }} {{ person.last_name }}</h4>
-            <p>{{ person.bio }}</p>
-        </div>
+    {% for person in blog_post.authors.all %}
+        {% with profile=person.get_admin_content %}
+            <div class="author">
+                <h4>{{ profile.name }}</h4>
+                <p>{{ profile.description }}</p>
+            </div>
+        {% endwith %}
     {% endfor %}
 
 Plugins
 -------
 
-``PersonTeaser`` - Display a single person
-``PersonList`` - Display a list of people
+- ``PersonTeaserPlugin`` ("Person teaser", model ``PersonTeaser``) - Display a
+  single selected person, with an optional bio toggle
 
 Admin
 -----
 
-Registered in Django admin with inline editing.
+``PersonAdmin`` is a ``GrouperModelAdmin`` (see :doc:`admin`) using
+``content_model = PersonContent``.
+
+What this app demonstrates
+--------------------------
+
+``Person`` is a **versioned grouper without a** ``language`` **field** — proof
+that versioning does not require multi-language content. It is also the canonical
+*target* of a relation (``BlogPost.authors``).
 
 See Also
 --------

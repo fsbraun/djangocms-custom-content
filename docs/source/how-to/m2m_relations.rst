@@ -1,298 +1,174 @@
 Set Up Many-to-Many Relations
 =============================
 
-djangocms-custom-content provides two complementary approaches for managing M2M relationships:
-
-1. **``invite_m2m_relations``** - Content model requests relations from target models
-2. **``relate_to``** - Model pushes relations onto target models
-
-Understanding the Direction
-----------------------------
-
-The key difference is **who initiates the relationship**:
-
-**``invite_m2m_relations`` (Content Model → Target Model)**
-
-- The source model **knows about** and **requests** relations from target models
-- If the target model is not installed or lacks a relation model, a dummy accessor
-  is created (graceful degradation)
-- Typical use: A content model inviting a grouper model to participate
-
-**``relate_to`` (Model → Unknown Targets)**
-
-- The source model **pushes** itself onto target models
-- Target models are unaware of the source and its configuration
-- The source unilaterally adds accessors to target models
-- Typical use: A model relating to multiple content types, including
-  already installed ones.
-- Since the target model does not know about the source, it will not copy
-  the relation when copied. Hence avoid using ``relate_to`` to relate to
-  potentially versioned content models, since they are copied regularly when
-  new versions are created.
-
-Example Comparison
-------------------
-
-**Scenario: BlogPostContent wants authors**
-
-Using ``invite_m2m_relations`` (content model requests):
+Relating content to content takes one line. Add a
+:class:`~djangocms_custom_content.relations.RelationField` to a **grouper** model
+— it reads just like Django's ``ManyToManyField``:
 
 .. code-block:: python
 
-    class BlogPostContent(AbstractCustomContent):
-        class CMSConfig:
-            # "I invite Person to give me authors"
-            invite_m2m_relations = [("authors", "my_app.Person")]
+    from djangocms_custom_content.relations import RelationField
 
-The source knows: "I want authors from Person". ``Person`` needs to provide
-the m2m relation through model.
+    class BlogPost(AbstractCustomGrouper):
+        authors = RelationField("people.Person", related_name="authored_posts", ordered=True)
 
-Result: ``blog_post_content.authors.add(person)``
+Run ``makemigrations`` and you're done — ``post.authors.add(person)`` and
+``person.authored_posts.all()`` both work, and the admin renders ``authors`` as a
+sortable autocomplete. The rest of this guide unpacks the options.
 
-
-**Scenario: FlatCategory relates to BlogPost**
-
-Using ``relate_to`` (model pushes to target):
-
-.. code-block:: python
-
-    class FlatCategory(AbstractCustomContent):
-        class CMSConfig:
-            # "I'm adding categories accessor to BlogPost"
-            relate_to = [("categories", "my_app.BlogPost")]
-
-    FlatCategoryRelation = custom_relation_factory(FlatCategory)
-
-The ``BlogPost`` doesn't know about ``FlatCategory`` internals. ``FlatCategory`` has
-to provide the m2m relation through model.
-
-Result: ``blog_post.categories.add(category)``
-
-
-Approach 1: Using ``invite_m2m_relations`` (Content Model Requests)
-------------------------------------------------------------------
-
-Use ``invite_m2m_relations`` when:
-
-- Your content model knows about and depends on target models
-- You want graceful handling if targets are not available
-- Target models should provide a specific relation interface
-
-**Example: BlogPostContent inviting authors from Person**
-
-.. code-block:: python
-
-    from djangocms_custom_content.models import (
-        AbstractCustomContent,
-        custom_relation_factory,
-    )
-
-    class BlogPostContent(AbstractCustomContent):
-        """Blog post content with versioning."""
-        post = models.ForeignKey("my_app.BlogPost", on_delete=models.CASCADE)
-        title = models.CharField(max_length=200)
-        body = models.TextField()
-
-        class CMSConfig:
-            enable_versioning = True
-            # Invite authors from Person model
-            invite_m2m_relations = [
-                ("authors", "my_app.Person"),
-            ]
-
-        def __str__(self):
-            return self.title
-
-
-Usage:
-
-.. code-block:: python
-
-    blog_post_content = BlogPostContent.objects.first()
-    person = Person.objects.first()
-
-    blog_post_content.authors.add(person)
-    blog_post_content.authors.all()  # QuerySet of Person objects
-
-**Graceful Degradation:**
-
-If ``Person`` model is not installed or lacks a relation model, ``invite_m2m_relations`` creates a dummy accessor that returns empty querysets instead of failing.
-
-
-Approach 2: Using ``relate_to`` (Model Pushes to Target)
--------------------------------------------------------
-
-Use ``relate_to`` when:
-
-- Your model should relate to target models independently
-- Target models don't need to know about your model
-- You want to add accessors to multiple unrelated models
-
-**Example: FlatCategory adding categories to BlogPost**
-
-.. code-block:: python
-
-    class FlatCategory(AbstractCustomContent):
-        """A simple category model."""
-        title = models.CharField(max_length=100)
-        slug = models.SlugField(unique=True)
-
-        class CMSConfig:
-            # Push categories accessor to BlogPost
-            relate_to = [
-                ("categories", "my_app.BlogPost"),
-                ("categories", "my_app.Article"),  # Multiple targets possible
-            ]
-
-        def __str__(self):
-            return self.title
-
-    # Create the relation model (required)
-    FlatCategoryRelation = custom_relation_factory(FlatCategory)
-
-Usage:
-
-.. code-block:: python
-
-    blog_post = BlogPost.objects.first()
-    category = FlatCategory.objects.first()
-
-    blog_post.categories.add(category)
-    blog_post.categories.all()  # QuerySet of FlatCategory objects
-
-
-Key Differences
----------------
-
-.. list-table::
-   :widths: 25 38 37
-   :header-rows: 1
-
-   * - Aspect
-     - ``invite_m2m_relations``
-     - ``relate_to``
-   * - Semantic
-     - "I request from you"
-     - "I push to you"
-   * - Initiation
-     - Source knows target
-     - Source may not know target
-   * - Direction
-     - Content model → Target
-     - Model → Unknown targets
-   * - If target unavailable
-     - Creates dummy accessor
-     - Skips silently (LookupError)
-   * - Typical use
-     - Authors, Contributors
-     - Categories, Tags
-   * - Target awareness
-     - Target expects source
-     - Target unaware of source
-   * - Best for
-     - Related models with awareness
-     - Simple models relating widely
-
-
-Using the Accessors
+Why a custom field?
 -------------------
 
-Both provide identical manager interfaces:
+Relations are anchored to the **grouper's** stable primary key, never to a
+versioned content row. djangocms-versioning copies content into new rows with
+new primary keys; anchoring to the grouper means relations survive version
+copies untouched. A single relation can also target groupers of any type,
+because storage uses a ``GenericForeignKey`` for the target.
+
+Mental model: it is django-taggit, but the "tags" are grouper objects and each
+relation gets its own through table.
+
+Declaring a relation
+---------------------
+
+Declare ``RelationField`` on the grouper that *owns* the relation:
 
 .. code-block:: python
 
-    # add() - Add objects
-    model.accessor.add(obj1, obj2)
+    from djangocms_custom_content.models import AbstractCustomGrouper
+    from djangocms_custom_content.relations import RelationField
 
-    # all() - Get all related
-    related = model.accessor.all()
+    class BlogPost(AbstractCustomGrouper):
+        authors = RelationField(
+            "people.Person",
+            related_name="authored_posts",
+            ordered=True,
+        )
+        categories = RelationField(
+            "categories.FlatCategory",
+            related_name="blog_posts",
+        )
 
-    # filter() - Filter related
-    related = model.accessor.all().filter(name="Django")
+``RelationField`` arguments:
 
-    # remove() - Remove specific
-    model.accessor.remove(obj1)
+``target``
+    A model class or an ``"app_label.Model"`` string. You may name either the
+    grouper or its content model; both resolve to the grouper. The string form
+    is resolved lazily, so the target app need not be importable at declaration
+    time.
 
-    # clear() - Remove all
-    model.accessor.clear()
+``related_name``
+    Installs a reverse accessor of this name on the *target* grouper. The target
+    model does not import or declare anything — the reverse accessor simply
+    appears once the app registry is ready.
 
-    # count() - Count relations
-    count = model.accessor.all().count()
+``ordered`` (default ``False``)
+    Opt in to an explicit ordering column on the through table. Only then is a
+    :meth:`~djangocms_custom_content.relations.RelationManager.reorder` method
+    available and results returned in stored order.
 
-    # exists() - Check existence
-    if model.accessor.all().exists():
-        ...
+``through_name`` (optional)
+    Override the auto-generated through model class name.
 
-In Templates
+Each ``RelationField`` creates its own concrete through table with a uniqueness
+constraint (no duplicate edges) and an index for fast reverse lookups. No
+migration boilerplate is required beyond running ``makemigrations`` for the app
+that declares the field.
+
+Using the accessors
+-------------------
+
+The forward accessor lives on the owner grouper; the reverse accessor (if
+``related_name`` was given) lives on the target grouper. Both return real
+querysets, so ``.filter()``, ``.order_by()``, ``.count()`` and friends just work.
+
+.. code-block:: python
+
+    post = BlogPost.objects.first()
+    person = Person.objects.first()
+
+    # Write API — accepts a grouper OR a content object (normalised to grouper)
+    post.authors.add(person)
+    post.authors.remove(person)
+    post.authors.set([person])
+    post.authors.clear()
+
+    # Read API — backed by a queryset of target groupers
+    post.authors.all()
+    post.authors.filter(...)
+    post.authors.count()
+    post.authors.exists()
+
+    # Reverse accessor invited by related_name
+    person.authored_posts.all()   # BlogPost groupers authored by this person
+
+Ordered relations
+-----------------
+
+When the field is declared with ``ordered=True``, ``add()`` appends to the end
+and you can set an explicit order with ``reorder()``:
+
+.. code-block:: python
+
+    post.authors.reorder([alice, bob, carol])
+    post.authors.all()   # alice, bob, carol
+
+``reorder()`` raises ``TypeError`` on a relation that is not ordered.
+
+In templates
 ~~~~~~~~~~~~
+
+Because accessors return groupers, reach the displayable content through the
+grouper's ``get_admin_content`` (or ``get_content``):
 
 .. code-block:: django
 
-    {# invite_m2m_relations example #}
-    {% for author in blog_post_content.authors.all %}
-        <strong>{{ author.get_admin_content.name }}</strong>
+    {% for person in post.authors.all %}
+        {% with profile=person.get_admin_content %}
+            <strong>{{ profile.name }}</strong>
+        {% endwith %}
     {% endfor %}
 
-    {# relate_to example #}
-    {% for category in blog_post.categories.all %}
+    {% for category in post.categories.all %}
         <span class="category">{{ category.title }}</span>
     {% endfor %}
 
-Multiple Accessors
--------------------
+.. note::
 
-You can define multiple accessors from a single model:
+   ``FlatCategory`` is a grouper-less content model, so its accessor yields the
+   ``FlatCategory`` objects directly (``category.title`` above), while
+   ``Person`` is a grouper, so its content is reached via ``get_admin_content``.
 
-**Multiple targets with ``relate_to``:**
+Deleting targets
+----------------
 
-.. code-block:: python
+The concrete source foreign key cascades natively. The generic target has no
+database constraint, so when a target grouper is deleted the framework sweeps
+its dangling relation rows automatically.
 
-    class Tag(AbstractCustomContent):
-        name = models.CharField(max_length=100)
+Copying
+-------
 
-        class CMSConfig:
-            relate_to = [
-                ("tags", "blog.BlogPost"),
-                ("tags", "article.Article"),
-                ("tags", "product.Product"),
-            ]
-
-    TagRelation = custom_relation_factory(Tag)
-
-**Multiple accessors from different target with ``invite_m2m_relations``:**
+Edges are anchored to the grouper, so **creating a new version copies nothing** —
+the new version sees the same relations. They are only not carried over when you
+**duplicate the grouper itself** (just like a Django ``ManyToManyField``); copy
+them explicitly in that case:
 
 .. code-block:: python
 
-    class PersonContent(AbstractCustomContent):
-        class CMSConfig:
-            invite_m2m_relations = [
-                ("authors", "blog.BlogPost"),
-                ("reviewers", "article.Article"),
-            ]
+    from djangocms_custom_content.relations import iter_relation_fields
 
+    for name, _field in iter_relation_fields(type(source_grouper)):
+        getattr(new_grouper, name).set(getattr(source_grouper, name).all())
 
+A full duplicate usually also re-creates the grouper's **content** object(s)
+(pointed at ``new_grouper``) — a brand-new grouper has no content of its own.
 
-When to Use Which
------------------
-
-**Use ``invite_m2m_relations`` when:**
-
-- Your content model needs specific relations
-- You want graceful handling of missing targets
-- Relations are a desired extension to your model's logic
-- Target models are expected to have relation support
-
-**Use ``relate_to`` when:**
-
-- You want to add relations to models you don't control
-- The source model should work independently
-- You're adding a cross-cutting concern (categories, tags)
-- Target models shouldn't need to know about your model
-
+See :doc:`../explanation/relationships` for the full rationale.
 
 See Also
 --------
 
 - :doc:`../reference/index` - API reference
-- :doc:`../explanation/relationships` - Relationship architecture
+- :doc:`../explanation/relationships` - How the relation storage works
 - :doc:`../tutorials/model_with_m2m` - Step-by-step tutorial
