@@ -4,9 +4,9 @@ djangocms-custom-content
 
 |PyPiVersion| |PyVersion| |DjVersion| |CmsVersion| |Coverage|
 
-**Custom content types for django CMS — without the boilerplate.**
+**Custom content for django CMS — without the boilerplate.**
 
-Building a custom content type in django CMS by hand means wiring up a grouper,
+Building custom content in django CMS by hand means wiring up a grouper,
 versioning, a grouper admin, frontend editing, an app hook and migrations
 yourself. ``djangocms-custom-content`` does all of that — you write the model.
 
