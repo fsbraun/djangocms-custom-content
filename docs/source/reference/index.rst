@@ -30,6 +30,11 @@ integration. All options are read at app startup and default to off.
      - Register a CMS app hook exposing a detail view. The URL uses the model's
        ``slug`` field if present, otherwise its ``pk``; a ``get_absolute_url()``
        is injected onto the model. See :doc:`../how-to/apphooks`.
+   * - ``admin_menu``
+     - ``False``
+     - Add a shortcut to the grouper changelist in the toolbar's admin (site)
+       menu. Entries are sorted alphabetically above the *Administration*
+       break and are only shown to users with view permission on the grouper.
 
 Whether a content model participates as a grouper/content pair is inferred from
 its foreign key to an :class:`~djangocms_custom_content.models.AbstractCustomGrouper`;

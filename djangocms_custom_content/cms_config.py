@@ -43,6 +43,11 @@ class CustomContentConfig(CMSAppConfig):
         self.cms_toolbar_enabled_models = []
         self.cms_apphook_dict = {}
         self.custom_content_groupers = {}
+        # Models whose changelist is linked from the admin (site) menu because
+        # their content opted in via ``admin_menu = True`` on its ``CMSConfig``.
+        # Holds the grouper model for grouper-backed content, or the content
+        # model itself for plain (grouper-less) content such as ``FlatCategory``.
+        self.admin_menu_models = set()
 
         if hasattr(self, "get_contract"):
             self.versioning_contract = self.get_contract("djangocms_versioning")
@@ -136,6 +141,7 @@ class CustomContentConfig(CMSAppConfig):
             "",
         )
         has_language_field = False
+        grouper_model = None
         if grouper_field_name:
             grouper_model = model._meta.get_field(grouper_field_name).related_model
             has_language_field = any(f.name == "language" for f in model._meta.get_fields())
@@ -144,6 +150,13 @@ class CustomContentConfig(CMSAppConfig):
 
             if has_language_field and grouper_model is not None:
                 self.register_extra_grouping_field(grouper_model)
+
+        # Opt into an admin (site) menu shortcut. Grouper-backed content links
+        # to the grouper changelist; a plain (grouper-less) content model such
+        # as ``FlatCategory`` links to its own changelist.
+        cms_config = getattr(model, "CMSConfig", None)
+        if getattr(cms_config, "admin_menu", False):
+            self.admin_menu_models.add(grouper_model or model)
 
         self.register_frontend_editing(model, grouper_field_name)
         self.register_versioning(model, grouper_field_name, has_language_field)

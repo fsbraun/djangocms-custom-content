@@ -40,6 +40,7 @@ class PersonContent(AbstractCustomContent):
         enable_versioning = True
         enable_frontend_editing = True
         apphook = True
+        admin_menu = True
 
     def __str__(self):
         return self.name

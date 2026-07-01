@@ -1,8 +1,6 @@
 from cms.cms_toolbars import (
     ADMIN_MENU_IDENTIFIER,
     ADMINISTRATION_BREAK,
-    LANGUAGE_MENU_IDENTIFIER,
-    SHORTCUTS_BREAK,
 )
 from cms.toolbar.items import Break
 from cms.toolbar_base import CMSToolbar
@@ -28,9 +26,18 @@ class CustomContentToolbar(CMSToolbar):
     @classmethod
     def get_insert_position(cls, admin_menu, item_name):
         """
-        Ensures that there is a SHORTCUTS_BREAK and returns a position for an
-        alphabetical position against all custom content items between SHORTCUTS_BREAK, and
-        the ADMINISTRATION_BREAK.
+        Return the position for a custom content shortcut in the admin (site)
+        menu.
+
+        Entries are grouped directly above the ``ADMINISTRATION_BREAK`` and
+        ordered alphabetically among themselves, following the convention used
+        by djangocms-stories and djangocms-alias. The first menu item (the
+        current site entry) is always kept in place.
+
+        Note that django CMS core adds the ``SHORTCUTS_BREAK`` *below* the
+        ``ADMINISTRATION_BREAK`` (near the "Logout" entry), so it cannot be
+        used as an upper anchor for the shortcut region -- the
+        ``ADMINISTRATION_BREAK`` is the only reliable boundary.
 
         Args:
             ``admin_menu``: The CMS admin menu instance to inspect and modify.
@@ -39,44 +46,39 @@ class CustomContentToolbar(CMSToolbar):
         Returns:
             The integer position where the item should be inserted.
         """
-        start = admin_menu.find_first(Break, identifier=SHORTCUTS_BREAK)
-
-        if not start:
-            end = admin_menu.find_first(Break, identifier=ADMINISTRATION_BREAK)
-            if not end:
-                # If neither break exists, add both breaks at the end
-                admin_menu.add_break(SHORTCUTS_BREAK)
-                admin_menu.add_break(ADMINISTRATION_BREAK)
-                start = admin_menu.find_first(Break, identifier=SHORTCUTS_BREAK)
-                end = admin_menu.find_first(Break, identifier=ADMINISTRATION_BREAK)
-            else:
-                admin_menu.add_break(SHORTCUTS_BREAK, position=end.index)
-                start = admin_menu.find_first(Break, identifier=SHORTCUTS_BREAK)
-
         end = admin_menu.find_first(Break, identifier=ADMINISTRATION_BREAK)
         if not end:
-            # If ADMINISTRATION_BREAK doesn't exist, add it after SHORTCUTS_BREAK
+            # If the administration break doesn't exist yet, add it so the
+            # shortcut has a stable boundary to sort against.
             admin_menu.add_break(ADMINISTRATION_BREAK)
             end = admin_menu.find_first(Break, identifier=ADMINISTRATION_BREAK)
 
-        items = admin_menu.get_items()[start.index + 1 : end.index]
+        # Keep the first item (the current site / "Users" entry) in place and
+        # sort alphabetically within the region up to the administration break.
+        items = admin_menu.get_items()[1 : end.index]
         for idx, item in enumerate(items):
             try:
                 if force_str(item_name.lower()) < force_str(item.name.lower()):  # noqa: E501
-                    return idx + start.index + 1
+                    return idx + 1
             except AttributeError:
-                # Some item types do not have a 'name' attribute.
+                # Breaks and some item types do not have a 'name' attribute.
                 pass
         return end.index
 
     def add_shortcut_links(self):
-        """Add shortcut links for each configured grouper model."""
+        """Add admin-menu shortcut links for content that opted in.
+
+        A model is included when its content sets ``admin_menu = True`` on its
+        ``CMSConfig``. The linked changelist is the grouper's for grouper-backed
+        content, or the content model's own for plain (grouper-less) content
+        such as ``FlatCategory`` (see ``admin_menu_models`` in the app config).
+        """
         admin_menu = self.toolbar.get_or_create_menu(ADMIN_MENU_IDENTIFIER)
 
-        for grouper, _field_name, _has_lang in self.config.custom_content_groupers.values():
-            if self.request.user.has_perm(f"{grouper._meta.app_label}.view_{grouper._meta.model_name}"):
-                name = force_str(grouper._meta.verbose_name_plural.title())
-                url = admin_reverse(f"{grouper._meta.app_label}_{grouper._meta.model_name}_changelist")
+        for model in self.config.admin_menu_models:
+            if self.request.user.has_perm(f"{model._meta.app_label}.view_{model._meta.model_name}"):
+                name = force_str(model._meta.verbose_name_plural.title())
+                url = admin_reverse(f"{model._meta.app_label}_{model._meta.model_name}_changelist")
                 admin_menu.add_sideframe_item(
                     name,
                     url=url,
