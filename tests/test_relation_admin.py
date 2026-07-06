@@ -79,7 +79,7 @@ class FormInjectionTests(AdminRelationTestBase):
 
     def test_sorted_widget_pulls_in_js(self):
         form_class = self.admin.get_form(self._request(), None)
-        js = list(form_class.base_fields["authors"].widget.media._js)
+        js = [str(entry) for entry in form_class.base_fields["authors"].widget.media._js]
         self.assertTrue(any("Sortable.min.js" in j for j in js))
         self.assertTrue(any("sorted-autocomplete.js" in j for j in js))
 

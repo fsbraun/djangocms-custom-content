@@ -267,6 +267,15 @@ class GetAdminContentCachingTestCase(TestCase):
         result = self.grouper.get_admin_content(language="en")
         self.assertEqual(result, self.en_content)
 
+    def test_get_admin_content_uses_prefetch_cache_for_language_content(self):
+        """Prefetched language-aware admin content should avoid a fallback query."""
+        self.grouper._admin_prefetch_cache = [self.en_content, self.de_content]
+
+        with self.assertNumQueries(0):
+            result = self.grouper.get_admin_content(language="de")
+
+        self.assertEqual(result, self.de_content)
+
 
 class ContentModelIntegrationTestCase(TestCase):
     """Integration tests for AbstractCustomContent model."""

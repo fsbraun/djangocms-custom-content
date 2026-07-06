@@ -81,6 +81,14 @@ class ForwardAccessorTests(RelationTestBase):
         self.post.authors.add(self.ann)
         self.assertEqual(self.post.authors.count(), 1)
 
+    def test_bulk_add_deduplicates_inputs(self):
+        self.post.authors.add(self.ann, self.ann, self.bob)
+        self.assertEqual(list(self.post.authors.all()), [self.ann, self.bob])
+
+    def test_add_rejects_unsaved_objects(self):
+        with self.assertRaisesMessage(ValueError, "saved model instances"):
+            self.post.authors.add(Person())
+
     def test_remove(self):
         self.post.authors.add(self.ann, self.bob)
         self.post.authors.remove(self.ann)
@@ -90,6 +98,16 @@ class ForwardAccessorTests(RelationTestBase):
         self.post.authors.add(self.ann)
         self.post.authors.set([self.bob])
         self.assertEqual(set(self.post.authors.all()), {self.bob})
+
+    def test_set_preserves_existing_edges(self):
+        self.post.authors.add(self.ann, self.bob)
+        through = BlogPost.authors.field.through
+        ann_edge_pk = through.objects.get(source=self.post, object_id=self.ann.pk).pk
+
+        self.post.authors.set([self.bob, self.ann])
+
+        self.assertEqual(through.objects.get(source=self.post, object_id=self.ann.pk).pk, ann_edge_pk)
+        self.assertEqual(list(self.post.authors.all()), [self.bob, self.ann])
 
     def test_clear(self):
         self.post.authors.add(self.ann, self.bob)
@@ -130,6 +148,41 @@ class OrderingTests(RelationTestBase):
         self.post.authors.add(self.bob, self.ann, self.cara)
         self.post.authors.reorder([self.cara, self.ann, self.bob])
         self.assertEqual(list(self.post.authors.all()), [self.cara, self.ann, self.bob])
+
+    def test_reorder_deduplicates_inputs(self):
+        self.post.authors.add(self.ann, self.bob)
+        through = BlogPost.authors.field.through
+        ann_edge_pk = through.objects.get(source=self.post, object_id=self.ann.pk).pk
+        bob_edge_pk = through.objects.get(source=self.post, object_id=self.bob.pk).pk
+
+        self.post.authors.reorder([self.ann, self.ann, self.bob])
+
+        self.assertEqual(through.objects.filter(source=self.post).count(), 2)
+        self.assertEqual(list(self.post.authors.all()), [self.ann, self.bob])
+        self.assertEqual(
+            {
+                through.objects.get(source=self.post, object_id=self.ann.pk).pk,
+                through.objects.get(source=self.post, object_id=self.bob.pk).pk,
+            },
+            {ann_edge_pk, bob_edge_pk},
+        )
+
+    def test_reorder_empty_iterable_preserves_existing_edges(self):
+        self.post.authors.add(self.ann, self.bob)
+        through = BlogPost.authors.field.through
+        ann_edge_pk = through.objects.get(source=self.post, object_id=self.ann.pk).pk
+        bob_edge_pk = through.objects.get(source=self.post, object_id=self.bob.pk).pk
+
+        self.post.authors.reorder([])
+
+        self.assertEqual(
+            {
+                through.objects.get(source=self.post, object_id=self.ann.pk).pk,
+                through.objects.get(source=self.post, object_id=self.bob.pk).pk,
+            },
+            {ann_edge_pk, bob_edge_pk},
+        )
+        self.assertEqual(list(self.post.authors.all()), [self.ann, self.bob])
 
 
 class ReverseAccessorTests(RelationTestBase):
@@ -180,6 +233,14 @@ class ReverseAccessorTests(RelationTestBase):
         self.ann.authored_posts.add(self.post1)
         self.ann.authored_posts.add(self.post1)
         self.assertEqual(self.ann.authored_posts.count(), 1)
+
+    def test_reverse_bulk_add_deduplicates_inputs(self):
+        self.ann.authored_posts.add(self.post1, self.post1, self.post2)
+        self.assertEqual(set(self.ann.authored_posts.all()), {self.post1, self.post2})
+
+    def test_reverse_add_rejects_unsaved_objects(self):
+        with self.assertRaisesMessage(ValueError, "saved model instances"):
+            self.ann.authored_posts.add(BlogPost())
 
     def test_reverse_add_accepts_content_object_and_stores_grouper(self):
         post1_content = BlogPostContent.admin_manager.filter(post=self.post1).first()

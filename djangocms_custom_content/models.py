@@ -53,6 +53,7 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
     _content_set = None
     _has_language_field = False
     _content_cache: models.Model | dict[str, models.Model] | None = None
+    _admin_prefetch_cache: list[models.Model]
     _is_admin_cache = None
 
     def __init__(self, *args, **kwargs):
@@ -139,10 +140,10 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
             This method is primarily used by the Django admin interface.
         """
         if hasattr(self, "_admin_prefetch_cache") and not self._is_admin_cache:
-            if self._has_language_field is None:
+            if self._has_language_field:
                 self._content_cache = {obj.language: obj for obj in self._admin_prefetch_cache}
             else:
-                self._content_cache = self._admin_prefetch_cache[0]
+                self._content_cache = self._admin_prefetch_cache[0] if self._admin_prefetch_cache else None
         self._is_admin_cache = True
         return self._get_content(
             language or get_language(), self._content_set(manager="admin_manager").latest_content()

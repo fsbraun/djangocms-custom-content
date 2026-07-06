@@ -15,6 +15,8 @@ lives here.
 
 from __future__ import annotations
 
+from typing import Any
+
 from django import forms
 from django.forms.models import ModelFormMetaclass
 
@@ -77,7 +79,7 @@ class RelationModelFormMetaclass(ModelFormMetaclass):
 class RelationModelForm(forms.ModelForm, metaclass=RelationModelFormMetaclass):
     """``ModelForm`` that exposes a model's grouper relations as form fields."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         instance = getattr(self, "instance", None)
         if instance is not None and instance.pk:
@@ -88,8 +90,12 @@ class RelationModelForm(forms.ModelForm, metaclass=RelationModelFormMetaclass):
                         list(getattr(instance, field_name).all().values_list("pk", flat=True)),
                     )
 
-    def _save_m2m(self):
+    def _save_m2m(self) -> None:
         super()._save_m2m()
-        for field_name, _relation_field in iter_relation_fields(self._meta.model):
+        for field_name, relation_field in iter_relation_fields(self._meta.model):
             if field_name in self.cleaned_data:
-                getattr(self.instance, field_name).set(self.cleaned_data[field_name])
+                submitted = [obj.pk for obj in self.cleaned_data[field_name]]
+                current = list(getattr(self.instance, field_name).all().values_list("pk", flat=True))
+                relation_changed = current != submitted if relation_field.ordered else set(current) != set(submitted)
+                if relation_changed:
+                    getattr(self.instance, field_name).set(self.cleaned_data[field_name])
