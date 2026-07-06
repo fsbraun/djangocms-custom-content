@@ -1,5 +1,5 @@
 import pytest
-from cms.cms_toolbars import ADMIN_MENU_IDENTIFIER, ADMINISTRATION_BREAK, SHORTCUTS_BREAK
+from cms.cms_toolbars import ADMIN_MENU_IDENTIFIER, ADMINISTRATION_BREAK
 from cms.toolbar.toolbar import CMSToolbar as ToolbarClass
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -372,25 +372,51 @@ class CustomContentToolbarTestCase(TestCase):
         has_blog = any("blog" in name for name in item_names)
         self.assertTrue(has_blog, f"Blog post shortcut should be added with view permission. Found: {item_names}")
 
+    def test_shortcut_links_respect_admin_menu_opt_in(self):
+        """Groupers not opted in via ``admin_menu`` get no admin-menu shortcut."""
+        from unittest import mock
+
+        from django.apps import apps
+
+        config = apps.get_app_config("djangocms_custom_content").cms_config
+
+        toolbar = self.get_toolbar(self.post_content, self.superuser)
+        # Simulate no content model opting into the admin menu.
+        with mock.patch.object(config, "admin_menu_models", set()):
+            toolbar.populate()
+
+        admin_menu = toolbar.toolbar.get_menu(ADMIN_MENU_IDENTIFIER)
+        if not admin_menu:
+            return
+
+        item_names = [str(item.name).lower() for item in admin_menu.get_items() if hasattr(item, "name")]
+        has_custom_content = any("blog" in name or "people" in name or "person" in name for name in item_names)
+        self.assertFalse(
+            has_custom_content,
+            f"No shortcuts should be added when no grouper opted in. Found: {item_names}",
+        )
+
+    def test_plain_content_model_shortcut(self):
+        """A plain (grouper-less) content model opted in links to its own changelist."""
+        toolbar = self.get_toolbar(self.post_content, self.superuser)
+        toolbar.populate()
+
+        admin_menu = toolbar.toolbar.get_menu(ADMIN_MENU_IDENTIFIER)
+        self.assertIsNotNone(admin_menu)
+
+        # FlatCategory has no grouper, so it should appear via its own changelist.
+        category_items = [
+            item for item in admin_menu.get_items() if getattr(item, "url", None) and "/flatcategory/" in item.url
+        ]
+        self.assertTrue(category_items, "FlatCategory should have an admin-menu shortcut")
+        self.assertTrue(str(category_items[0].name).startswith("Categories"))
+
 
 class GetInsertPositionTests(TestCase):
     """Tests for CustomContentToolbar.get_insert_position."""
 
-    def test_adds_breaks_when_missing(self):
-        menu = _FakeMenu()
-
-        position = CustomContentToolbar.get_insert_position(menu, "Foo")
-
-        start = menu.find_first(None, SHORTCUTS_BREAK)
-        end = menu.find_first(None, ADMINISTRATION_BREAK)
-        self.assertIsNotNone(start)
-        self.assertIsNotNone(end)
-        self.assertLess(start.index, end.index)
-        self.assertEqual(position, end.index)
-
     def test_adds_admin_break_when_missing(self):
         menu = _FakeMenu()
-        menu.add_break(SHORTCUTS_BREAK)
 
         position = CustomContentToolbar.get_insert_position(menu, "Foo")
 
@@ -398,21 +424,33 @@ class GetInsertPositionTests(TestCase):
         self.assertIsNotNone(end)
         self.assertEqual(position, end.index)
 
-    def test_inserts_alphabetically_between_breaks(self):
+    def test_inserts_alphabetically_above_admin_break(self):
         menu = _FakeMenu()
-        menu.add_break(SHORTCUTS_BREAK)
+        menu.add_item(name="Users")  # first item is kept in place
         menu.add_item(name="Alpha")
         menu.add_item(name="Zulu")
         menu.add_break(ADMINISTRATION_BREAK)
 
         position = CustomContentToolbar.get_insert_position(menu, "Bravo")
 
-        start = menu.find_first(None, SHORTCUTS_BREAK)
-        self.assertEqual(position, start.index + 2)
+        # Between "Alpha" (index 1) and "Zulu" (index 2).
+        self.assertEqual(position, 2)
+
+    def test_keeps_first_item_in_place(self):
+        menu = _FakeMenu()
+        menu.add_item(name="Users")  # first item is kept in place
+        menu.add_break(ADMINISTRATION_BREAK)
+
+        position = CustomContentToolbar.get_insert_position(menu, "Aardvark")
+
+        # Even though "Aardvark" sorts before "Users", the first item is never
+        # displaced -- the shortcut lands at the administration break.
+        end = menu.find_first(None, ADMINISTRATION_BREAK)
+        self.assertEqual(position, end.index)
 
     def test_returns_end_when_name_is_last(self):
         menu = _FakeMenu()
-        menu.add_break(SHORTCUTS_BREAK)
+        menu.add_item(name="Users")
         menu.add_item(name="Alpha")
         menu.add_item(name="Zulu")
         menu.add_break(ADMINISTRATION_BREAK)
@@ -424,7 +462,7 @@ class GetInsertPositionTests(TestCase):
 
     def test_ignores_items_without_name(self):
         menu = _FakeMenu()
-        menu.add_break(SHORTCUTS_BREAK)
+        menu.add_item(name="Users")
         menu.add_item(name=None)
         menu.add_break(ADMINISTRATION_BREAK)
 

@@ -15,6 +15,9 @@ class FlatCategory(AbstractCustomContent):
         verbose_name_plural = _("Categories")
         ordering = ("title",)
 
+    class CMSConfig:
+        admin_menu = True
+
     # The reverse relation ``blog_posts`` is invited here by
     # ``BlogPost.categories`` (see contrib/blog/models.py).
 

@@ -40,6 +40,7 @@ class BlogPostContent(AbstractCustomContent):
     class CMSConfig:
         enable_versioning = True
         enable_frontend_editing = True
+        admin_menu = True
 
     def get_template(self):
         return "blog/detail.html"
