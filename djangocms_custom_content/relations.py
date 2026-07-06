@@ -177,6 +177,8 @@ def _unique_groupers(objs: Iterable[models.Model]) -> list[models.Model]:
     seen = set()
     for obj in objs:
         grouper = grouper_of(obj)
+        if grouper.pk is None:
+            raise ValueError("Relations can only be created for saved model instances.")
         if grouper.pk in seen:
             continue
         seen.add(grouper.pk)
@@ -258,8 +260,11 @@ class RelationManager:
         ct = _content_type_for(self.target_model)
         new_ids = [grouper.pk for grouper in groupers]
         with transaction.atomic():
-            self._edges().filter(content_type=ct).exclude(object_id__in=new_ids).delete()
-            existing = {edge.object_id: edge for edge in self._edges().filter(content_type=ct, object_id__in=new_ids)}
+            existing_edges = {edge.object_id: edge for edge in self._edges().filter(content_type=ct)}
+            removed_edge_pks = [edge.pk for object_id, edge in existing_edges.items() if object_id not in new_ids]
+            if removed_edge_pks:
+                self.through.objects.filter(pk__in=removed_edge_pks).delete()
+            existing = {object_id: edge for object_id, edge in existing_edges.items() if object_id in new_ids}
             missing = []
             for position, grouper in enumerate(groupers):
                 if grouper.pk in existing:

@@ -92,9 +92,10 @@ class RelationModelForm(forms.ModelForm, metaclass=RelationModelFormMetaclass):
 
     def _save_m2m(self) -> None:
         super()._save_m2m()
-        for field_name, _relation_field in iter_relation_fields(self._meta.model):
+        for field_name, relation_field in iter_relation_fields(self._meta.model):
             if field_name in self.cleaned_data:
                 submitted = [obj.pk for obj in self.cleaned_data[field_name]]
                 current = list(getattr(self.instance, field_name).all().values_list("pk", flat=True))
-                if current != submitted:
+                relation_changed = current != submitted if relation_field.ordered else set(current) != set(submitted)
+                if relation_changed:
                     getattr(self.instance, field_name).set(self.cleaned_data[field_name])
