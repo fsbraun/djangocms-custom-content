@@ -81,6 +81,10 @@ class ForwardAccessorTests(RelationTestBase):
         self.post.authors.add(self.ann)
         self.assertEqual(self.post.authors.count(), 1)
 
+    def test_bulk_add_deduplicates_inputs(self):
+        self.post.authors.add(self.ann, self.ann, self.bob)
+        self.assertEqual(list(self.post.authors.all()), [self.ann, self.bob])
+
     def test_remove(self):
         self.post.authors.add(self.ann, self.bob)
         self.post.authors.remove(self.ann)
@@ -90,6 +94,16 @@ class ForwardAccessorTests(RelationTestBase):
         self.post.authors.add(self.ann)
         self.post.authors.set([self.bob])
         self.assertEqual(set(self.post.authors.all()), {self.bob})
+
+    def test_set_preserves_existing_edges(self):
+        self.post.authors.add(self.ann, self.bob)
+        through = BlogPost.authors.field.through
+        ann_edge_pk = through.objects.get(source=self.post, object_id=self.ann.pk).pk
+
+        self.post.authors.set([self.bob, self.ann])
+
+        self.assertEqual(through.objects.get(source=self.post, object_id=self.ann.pk).pk, ann_edge_pk)
+        self.assertEqual(list(self.post.authors.all()), [self.bob, self.ann])
 
     def test_clear(self):
         self.post.authors.add(self.ann, self.bob)
@@ -180,6 +194,10 @@ class ReverseAccessorTests(RelationTestBase):
         self.ann.authored_posts.add(self.post1)
         self.ann.authored_posts.add(self.post1)
         self.assertEqual(self.ann.authored_posts.count(), 1)
+
+    def test_reverse_bulk_add_deduplicates_inputs(self):
+        self.ann.authored_posts.add(self.post1, self.post1, self.post2)
+        self.assertEqual(set(self.ann.authored_posts.all()), {self.post1, self.post2})
 
     def test_reverse_add_accepts_content_object_and_stores_grouper(self):
         post1_content = BlogPostContent.admin_manager.filter(post=self.post1).first()

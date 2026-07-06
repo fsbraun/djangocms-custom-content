@@ -28,11 +28,12 @@ opt-in feature; without it no ordering column is created.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from collections.abc import Iterable, Iterator
+from typing import TYPE_CHECKING, Any, cast
 
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
+from django.db import models, transaction
 from django.db.models.base import ModelBase
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
@@ -170,6 +171,19 @@ def _content_type_for(model: type[models.Model]) -> ContentType:
     return ContentType.objects.get_for_model(model, for_concrete_model=False)
 
 
+def _unique_groupers(objs: Iterable[models.Model]) -> list[models.Model]:
+    """Return grouper-normalized objects, preserving first-seen order."""
+    groupers = []
+    seen = set()
+    for obj in objs:
+        grouper = grouper_of(obj)
+        if grouper.pk in seen:
+            continue
+        seen.add(grouper.pk)
+        groupers.append(grouper)
+    return groupers
+
+
 class RelationManager:
     """Forward accessor ``owner.<field>`` → a queryset of target groupers.
 
@@ -191,10 +205,10 @@ class RelationManager:
         self.target_model = target_model
         self.ordered = ordered
 
-    def _edges(self):
+    def _edges(self) -> models.QuerySet:
         return self.through.objects.filter(source=self.instance)
 
-    def get_queryset(self):
+    def get_queryset(self) -> models.QuerySet:
         edges = self._edges()
         qs = self.target_model._default_manager.filter(pk__in=edges.values("object_id"))
         if self.ordered:
@@ -203,54 +217,87 @@ class RelationManager:
         return qs
 
     # Read API delegates to a real queryset.
-    def all(self):
+    def all(self) -> models.QuerySet:
         return self.get_queryset()
 
-    def filter(self, *args, **kwargs):
+    def filter(self, *args: Any, **kwargs: Any) -> models.QuerySet:
         return self.get_queryset().filter(*args, **kwargs)
 
-    def count(self):
+    def count(self) -> int:
         return self._edges().count()
 
-    def exists(self):
+    def exists(self) -> bool:
         return self._edges().exists()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[models.Model]:
         return iter(self.get_queryset())
 
     # Write API normalises content → grouper and stores the stable pk.
-    def add(self, *objs):
+    def add(self, *objs: models.Model) -> None:
+        groupers = _unique_groupers(objs)
+        if not groupers:
+            return
         ct = _content_type_for(self.target_model)
         next_order = (self._edges().aggregate(models.Max("order"))["order__max"] or 0) if self.ordered else 0
-        for obj in objs:
-            grouper = grouper_of(obj)
-            defaults = {}
+        rows = []
+        for grouper in groupers:
+            row = self.through(source=self.instance, content_type=ct, object_id=grouper.pk)
             if self.ordered:
                 next_order += 1
-                defaults["order"] = next_order
-            self.through.objects.get_or_create(
-                source=self.instance, content_type=ct, object_id=grouper.pk, defaults=defaults
-            )
+                row.order = next_order
+            rows.append(row)
+        self.through.objects.bulk_create(rows, ignore_conflicts=True)
 
-    def remove(self, *objs):
+    def remove(self, *objs: models.Model) -> None:
         ct = _content_type_for(self.target_model)
         ids = [grouper_of(obj).pk for obj in objs]
         self._edges().filter(content_type=ct, object_id__in=ids).delete()
 
-    def set(self, objs):
-        self.clear()
-        self.add(*objs)
+    def set(self, objs: Iterable[models.Model]) -> None:
+        groupers = _unique_groupers(objs)
+        ct = _content_type_for(self.target_model)
+        new_ids = [grouper.pk for grouper in groupers]
+        with transaction.atomic():
+            self._edges().filter(content_type=ct).exclude(object_id__in=new_ids).delete()
+            existing = {edge.object_id: edge for edge in self._edges().filter(content_type=ct, object_id__in=new_ids)}
+            missing = []
+            for position, grouper in enumerate(groupers):
+                if grouper.pk in existing:
+                    continue
+                row = self.through(source=self.instance, content_type=ct, object_id=grouper.pk)
+                if self.ordered:
+                    row.order = position
+                missing.append(row)
+            self.through.objects.bulk_create(missing, ignore_conflicts=True)
+            if self.ordered:
+                updates = []
+                for position, object_id in enumerate(new_ids):
+                    edge = existing.get(object_id)
+                    if edge is not None and edge.order != position:
+                        edge.order = position
+                        updates.append(edge)
+                if updates:
+                    self.through.objects.bulk_update(updates, ["order"])
 
-    def clear(self):
+    def clear(self) -> None:
         self._edges().delete()
 
-    def reorder(self, objs):
+    def reorder(self, objs: Iterable[models.Model]) -> None:
         """Set explicit ordering from an iterable of grouper/content objects."""
         if not self.ordered:
             raise TypeError("reorder() requires ordered=True on the relation")
         ct = _content_type_for(self.target_model)
-        for position, obj in enumerate(objs):
-            self._edges().filter(content_type=ct, object_id=grouper_of(obj).pk).update(order=position)
+        order = {grouper.pk: position for position, grouper in enumerate(_unique_groupers(objs))}
+        if not order:
+            return
+        updates = []
+        for edge in self._edges().filter(content_type=ct, object_id__in=order):
+            new_order = order[edge.object_id]
+            if edge.order != new_order:
+                edge.order = new_order
+                updates.append(edge)
+        if updates:
+            self.through.objects.bulk_update(updates, ["order"])
 
 
 class ReverseRelationManager:
@@ -261,38 +308,43 @@ class ReverseRelationManager:
         self.through = through
         self.source_model = source_model
 
-    def _edges(self):
+    def _edges(self) -> models.QuerySet:
         ct = _content_type_for(type(self.instance))
         return self.through.objects.filter(content_type=ct, object_id=self.instance.pk)
 
-    def get_queryset(self):
+    def get_queryset(self) -> models.QuerySet:
         return self.source_model._default_manager.filter(pk__in=self._edges().values("source_id"))
 
-    def all(self):
+    def all(self) -> models.QuerySet:
         return self.get_queryset()
 
-    def filter(self, *args, **kwargs):
+    def filter(self, *args: Any, **kwargs: Any) -> models.QuerySet:
         return self.get_queryset().filter(*args, **kwargs)
 
-    def count(self):
+    def count(self) -> int:
         return self._edges().count()
 
-    def exists(self):
+    def exists(self) -> bool:
         return self._edges().exists()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[models.Model]:
         return iter(self.get_queryset())
 
-    def add(self, *objs):
+    def add(self, *objs: models.Model) -> None:
+        groupers = _unique_groupers(objs)
+        if not groupers:
+            return
         ct = _content_type_for(type(self.instance))
-        for obj in objs:
-            self.through.objects.get_or_create(source=grouper_of(obj), content_type=ct, object_id=self.instance.pk)
+        self.through.objects.bulk_create(
+            [self.through(source=grouper, content_type=ct, object_id=self.instance.pk) for grouper in groupers],
+            ignore_conflicts=True,
+        )
 
-    def remove(self, *objs):
+    def remove(self, *objs: models.Model) -> None:
         sources = [grouper_of(obj).pk for obj in objs]
         self._edges().filter(source_id__in=sources).delete()
 
-    def clear(self):
+    def clear(self) -> None:
         self._edges().delete()
 
 

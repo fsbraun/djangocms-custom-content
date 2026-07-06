@@ -10,18 +10,29 @@ M2M, so the autocomplete is served by a small endpoint on the grouper admin
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from django import forms
 from django.apps import apps
 from django.contrib.admin.widgets import AutocompleteSelectMultiple
 from django.core.exceptions import PermissionDenied
-from django.db.models import Q
-from django.http import JsonResponse
+from django.db import models
+from django.db.models import Q, QuerySet
+from django.http import HttpRequest, JsonResponse
 from django.urls import path, reverse
 
 from djangocms_custom_content.forms import RelationModelForm
 from djangocms_custom_content.relations import iter_relation_fields
 
 CONTENT_PREFIX = "content__"
+
+
+class _RelationTargetAdmin(Protocol):
+    search_fields: tuple[str, ...] | list[str]
+
+    def has_view_permission(self, request: HttpRequest) -> bool: ...
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet: ...
 
 
 # --------------------------------------------------------------------------- #
@@ -125,11 +136,17 @@ class RelationAdminMixin:
         target_admin = self.admin_site._registry.get(target)
         if target_admin is None or not target_admin.has_view_permission(request):
             return empty
-        queryset = self._search_target(target, target_admin, request.GET.get("term", ""))
+        queryset = self._search_target(target, target_admin, request, request.GET.get("term", ""))
         results = [{"id": str(obj.pk), "text": str(obj)} for obj in queryset[:20]]
         return JsonResponse({"results": results, "pagination": {"more": False}})
 
-    def _search_target(self, target, target_admin, term):
+    def _search_target(
+        self,
+        target: type[models.Model],
+        target_admin: _RelationTargetAdmin,
+        request: HttpRequest,
+        term: str,
+    ) -> QuerySet:
         """Search the target by its admin ``search_fields``.
 
         ``GrouperModelAdmin`` declares its search fields with a ``content__``
@@ -137,7 +154,7 @@ class RelationAdminMixin:
         (e.g. ``content__name`` -> ``personcontent__name``) so the grouper is
         matched by its content. Plain search fields are used as-is.
         """
-        queryset = target._default_manager.all()
+        queryset = target_admin.get_queryset(request)
         if not term:
             return queryset.distinct()
         content_path = self._content_query_path(target)
@@ -152,7 +169,7 @@ class RelationAdminMixin:
         return queryset.filter(query).distinct() if query else queryset.distinct()
 
     @staticmethod
-    def _content_query_path(grouper_model):
+    def _content_query_path(grouper_model: type[models.Model]) -> str | None:
         """Reverse query name from a grouper to its content model, or ``None``."""
         config = apps.get_app_config("djangocms_custom_content").cms_config
         for content_model, (group_model, group_field, _lang) in config.custom_content_groupers.items():
