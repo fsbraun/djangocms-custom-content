@@ -73,7 +73,9 @@ class FormInjectionTests(AdminRelationTestBase):
         post = self._post()
         ann, bob = self._person("Ann", "ann"), self._person("Bob", "bob")
         post.authors.add(bob, ann)  # stored order: bob, ann
-        form_class = self.admin.get_form(self._request(), post)
+        request = self._request()
+        self.admin.get_grouping_from_request(request)
+        form_class = self.admin.get_form(request, post)
         form = form_class(instance=post)
         self.assertEqual(list(form.initial["authors"]), [bob.pk, ann.pk])
 
