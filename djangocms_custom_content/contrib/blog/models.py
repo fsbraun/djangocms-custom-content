@@ -42,9 +42,6 @@ class BlogPostContent(AbstractCustomContent):
         enable_frontend_editing = True
         admin_menu = True
 
-    def get_template(self):
-        return "blog/detail.html"
-
     def __str__(self):
         return self.title
 

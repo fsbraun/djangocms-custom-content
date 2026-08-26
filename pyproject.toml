@@ -45,7 +45,9 @@ urls.Source = "https://github.com/fsbraun/djangocms-custom-content"
 [tool.setuptools]
 packages.find.where = [ "." ]
 packages.find.include = [ "djangocms_custom_content*" ]
-package-data.djangocms_custom_content = [ "LICENSE", "locale/**/*", "README.rst", "static/**/*", "templates/**/*" ]
+# Contrib apps ship their own templates, so every package contributes its template dir.
+package-data."*" = [ "templates/**/*" ]
+package-data.djangocms_custom_content = [ "LICENSE", "locale/**/*", "README.rst", "static/**/*" ]
 dynamic.version = { attr = "djangocms_custom_content.__version__" }
 
 [tool.black]

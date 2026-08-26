@@ -115,17 +115,25 @@ and you can set an explicit order with ``reorder()``:
 
 ``reorder()`` raises ``TypeError`` on a relation that is not ordered.
 
+.. note::
+
+   Ordering belongs to the **edge list**, so it applies to the forward accessor
+   only. ``ordered=True`` on ``BlogPost.authors`` orders the authors *within a
+   post*; it says nothing about the order of ``person.authored_posts``, which
+   comes back in the target model's default order.
+
 In templates
 ~~~~~~~~~~~~
 
 Because accessors return groupers, reach the displayable content through the
-grouper's ``get_admin_content`` (or ``get_content``):
+grouper — with ``get_content`` on the front end and ``get_admin_content`` in the
+admin:
 
 .. code-block:: django
 
     {% for person in post.authors.all %}
-        {% with profile=person.get_admin_content %}
-            <strong>{{ profile.name }}</strong>
+        {% with profile=person.get_content %}
+            {% if profile %}<strong>{{ profile.name }}</strong>{% endif %}
         {% endwith %}
     {% endfor %}
 
@@ -133,11 +141,104 @@ grouper's ``get_admin_content`` (or ``get_content``):
         <span class="category">{{ category.title }}</span>
     {% endfor %}
 
+.. warning::
+
+   Use ``get_content`` for anything a visitor sees. ``get_admin_content``
+   returns the **latest** content including unpublished drafts, so on a public
+   page it leaks work in progress.
+
 .. note::
 
    ``FlatCategory`` is a grouper-less content model, so its accessor yields the
    ``FlatCategory`` objects directly (``category.title`` above), while
-   ``Person`` is a grouper, so its content is reached via ``get_admin_content``.
+   ``Person`` is a grouper, so its content is reached via ``get_content``.
+
+.. _rendering-relations-in-a-detail-view:
+
+Rendering relations in a detail view
+------------------------------------
+
+A detail view is handed a **content** object, but relations live on **groupers**.
+Rendering "every blog post this person authored" is therefore a two-hop walk:
+
+.. code-block:: text
+
+    PersonContent  ->  Person  ->  BlogPost (groupers)  ->  BlogPostContent
+     the content       .person    .authored_posts.all()     .get_content()
+     being rendered    grouper     the reverse accessor      what you display
+
+The catch is the last hop. The accessor returns groupers regardless of
+publication state, and ``get_content()`` returns ``None`` for any grouper whose
+content is not published — so a naive loop renders blank entries for drafts and
+unpublished posts.
+
+Doing it in the view
+~~~~~~~~~~~~~~~~~~~~
+
+Resolve the content once, drop the ``None``\ s, and hand the template a plain
+list. This is the shape to prefer: the filtering is explicit, and the template
+stays free of logic.
+
+.. code-block:: python
+
+    from djangocms_custom_content.views import custom_detail_view_factory
+    from djangocms_custom_content.contrib.people.models import PersonContent
+
+
+    class PersonDetailView(custom_detail_view_factory(PersonContent)):
+        def get_context_data(self, **kwargs):
+            context = super().get_context_data(**kwargs)
+            posts = self.object.person.authored_posts.all()
+            # get_content() is None for posts that are not published.
+            context["posts"] = [content for post in posts if (content := post.get_content())]
+            return context
+
+.. code-block:: django
+
+    <h2>Posts by {{ personcontent.name }}</h2>
+    <ul>
+      {% for post in posts %}
+        <li>{{ post.title }}</li>
+      {% empty %}
+        <li>No published posts yet.</li>
+      {% endfor %}
+    </ul>
+
+To use the view, register it yourself rather than relying on the generated
+apphook (see :doc:`apphooks`).
+
+Doing it in the template
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you would rather not write a view, the same walk works in the template — the
+``{% if %}`` is what skips unpublished posts:
+
+.. code-block:: django
+
+    <h2>Posts by {{ personcontent.name }}</h2>
+    <ul>
+      {% for post in personcontent.person.authored_posts.all %}
+        {% with content=post.get_content %}
+          {% if content %}<li>{{ content.title }}</li>{% endif %}
+        {% endwith %}
+      {% endfor %}
+    </ul>
+
+This costs one query per post, so prefer the view for anything but a short list.
+
+Counting is cheaper than listing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``count()`` and ``exists()`` run against the through table alone and never touch
+the target model, so they are cheap — but for the same reason they count
+**edges**, not published posts:
+
+.. code-block:: python
+
+    person.authored_posts.count()    # includes unpublished posts
+
+If the number has to match the list you rendered, count the resolved list
+instead.
 
 Deleting targets
 ----------------

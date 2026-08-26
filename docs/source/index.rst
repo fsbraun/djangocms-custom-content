@@ -162,3 +162,4 @@ Contents
    how-to/index
    explanation/index
    reference/index
+   changelog
