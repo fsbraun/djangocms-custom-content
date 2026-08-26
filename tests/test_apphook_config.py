@@ -6,6 +6,7 @@ import pytest
 from cms.apphook_pool import apphook_pool
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
 from django.urls import path, reverse
 from django.views.generic import TemplateView
@@ -141,6 +142,24 @@ class GeneratedUrlTests(TestCase):
         instance.request = None
 
         self.assertEqual(instance.get_object().name, "Ada")
+
+    def test_an_unknown_slug_field_fails_at_startup(self):
+        """Otherwise it only surfaces as a FieldError on every detail request."""
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            self.register(PersonContent, "BadField", AppHookConfig(slug_field="nope"), "person")
+
+        message = str(ctx.exception)
+        self.assertIn("slug_field='nope'", message)
+        self.assertIn("PersonContent", message)
+
+    def test_pk_is_accepted_as_a_route_field(self):
+        """``pk`` is not a model field name but is a valid lookup."""
+        apphook = self.register(SampleGrouperContent, "PkExplicit", AppHookConfig(slug_field="pk"), "grouper")
+
+        self.assertIn(("<int:pk>/", "detail"), self.routes(apphook))
+
+    def test_a_known_slug_field_is_accepted(self):
+        self.register(PersonContent, "GoodField", AppHookConfig(slug_field="name"), "person")
 
     def test_the_default_route_passes_no_view_kwargs(self):
         apphook = self.register(PersonContent, "PlainSlug", AppHookConfig(), "person")

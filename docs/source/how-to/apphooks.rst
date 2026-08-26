@@ -201,7 +201,9 @@ is generated:
        Defaults to ``slug`` when the model has one, otherwise the primary key.
        A custom value is passed on to the detail view as ``slug_field`` and
        ``slug_url_kwarg``, so a view you supply yourself has to accept those —
-       any ``DetailView`` does.
+       any ``DetailView`` does. Naming a field the content model does not have
+       raises ``ImproperlyConfigured`` at startup rather than failing on every
+       request.
    * - ``namespace_field``
      - Field on the **grouper** naming the app hook instance an object belongs
        to. See `More than one app hook page`_.

@@ -7,6 +7,7 @@ from cms.utils import get_current_site
 from cms.utils.i18n import get_language_tuple
 from django.apps import apps
 from django.contrib.admin import site as admin_site
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db import models
 from django.urls import path, reverse
 
@@ -130,6 +131,24 @@ class CustomContentConfig(CMSAppConfig):
                 )
             )
 
+    @staticmethod
+    def validate_route_field(model: type[models.Model], slug_field: str | None) -> None:
+        """Fail at startup on a ``slug_field`` the content model does not have.
+
+        Without this the misconfiguration registers happily and only surfaces as a
+        ``FieldError`` on every request to a detail URL -- a long way from the
+        declaration that caused it.
+        """
+        if not slug_field or slug_field == "pk":
+            return
+        try:
+            model._meta.get_field(slug_field)
+        except FieldDoesNotExist as error:
+            raise ImproperlyConfigured(
+                f"{model._meta.label}.CMSConfig.apphook declares slug_field={slug_field!r}, "
+                f"but {model._meta.label} has no such field."
+            ) from error
+
     def register_apphook(self, model: type[models.Model], grouper_model_name: str, grouper_field_name: str = ""):
         """Generate and register the app hook described by ``CMSConfig.apphook``."""
         cms_config = getattr(model, "CMSConfig", None)
@@ -139,6 +158,7 @@ class CustomContentConfig(CMSAppConfig):
 
         # ``_meta.get_field`` raises rather than returning None, so ask the model.
         route_field = config.slug_field or ("slug" if model.has_slug_field() else "pk")
+        self.validate_route_field(model, config.slug_field)
         route = f"<slug:{route_field}>/" if route_field != "pk" else "<int:pk>/"
 
         detail_view_class = config.detail_view or custom_detail_view_factory(model)
