@@ -197,8 +197,11 @@ is generated:
      - Extra patterns, registered **before** the detail route so a literal path
        such as ``archive/`` wins over ``<slug:slug>/``.
    * - ``slug_field``
-     - Field the detail URL routes on. Defaults to ``slug`` when the model has
-       one, otherwise the primary key.
+     - Field the detail URL routes on, and the name of the URL parameter.
+       Defaults to ``slug`` when the model has one, otherwise the primary key.
+       A custom value is passed on to the detail view as ``slug_field`` and
+       ``slug_url_kwarg``, so a view you supply yourself has to accept those —
+       any ``DetailView`` does.
    * - ``namespace_field``
      - Field on the **grouper** naming the app hook instance an object belongs
        to. See `More than one app hook page`_.

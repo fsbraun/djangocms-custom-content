@@ -142,7 +142,13 @@ class CustomContentConfig(CMSAppConfig):
         route = f"<slug:{route_field}>/" if route_field != "pk" else "<int:pk>/"
 
         detail_view_class = config.detail_view or custom_detail_view_factory(model)
-        detail_view = detail_view_class.as_view()
+        # A custom ``slug_field`` names the URL parameter too, so the view has to be
+        # told which model field to look up and which kwarg carries it -- otherwise it
+        # looks for the standard ``slug``/``pk`` and finds neither.
+        view_kwargs = (
+            {"slug_field": route_field, "slug_url_kwarg": route_field} if route_field not in ("slug", "pk") else {}
+        )
+        detail_view = detail_view_class.as_view(**view_kwargs)
 
         # Extra URLs come first so a literal path can win over the slug pattern.
         urls = list(config.extra_urls)
