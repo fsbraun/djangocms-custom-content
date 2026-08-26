@@ -29,7 +29,11 @@ integration. All options are read at app startup and default to off.
      - ``False``
      - Register a CMS app hook exposing a detail view. The URL uses the model's
        ``slug`` field if present, otherwise its ``pk``; a ``get_absolute_url()``
-       is injected onto the model. See :doc:`../how-to/apphooks`.
+       is injected onto the model. Accepts an
+       :class:`~djangocms_custom_content.apphooks.AppHookConfig` instead of
+       ``True`` to supply views, extra URLs or a namespace field. No list view is
+       generated — write a list plugin for the root page instead, see
+       :ref:`apphook-root-page`. See :doc:`../how-to/apphooks`.
    * - ``admin_menu``
      - ``False``
      - Add a shortcut to the grouper changelist in the toolbar's admin (site)
@@ -161,6 +165,12 @@ Admin
 .. autoclass:: djangocms_custom_content.relation_admin.RelationAdminMixin
    :members:
    :show-inheritance:
+
+App hooks
+---------
+
+.. autoclass:: djangocms_custom_content.apphooks.AppHookConfig
+   :members:
 
 Helpers
 -------

@@ -57,6 +57,19 @@ Plugins
 -------
 
 - ``BlogPostTeaserPlugin`` ("Blog post") - Display a single selected post
+- ``BlogPostListPlugin`` ("Blog post list", model ``BlogPostList``) - A paginated
+  index of published posts, optionally featured-only
+
+The list plugin is the worked example of filling an app hook's root page, which
+the framework deliberately leaves to you rather than generating a list view (see
+:ref:`apphook-root-page`). Three things in it are worth copying into your own
+list plugin:
+
+- ``cache = False``, because the output depends on the page query parameter;
+- a page parameter namespaced by the plugin's primary key (``page-12``), so two
+  lists on one page paginate independently;
+- an out-of-range page falling back to the last page rather than raising a 404
+  from inside a plugin.
 
 Admin
 -----

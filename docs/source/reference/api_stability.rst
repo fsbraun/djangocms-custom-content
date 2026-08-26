@@ -39,6 +39,10 @@ any release.
 - :class:`djangocms_custom_content.admin.CustomGrouperAdminMixin`
 - :class:`djangocms_custom_content.forms.RelationModelForm`
 
+**App hooks**
+
+- :class:`djangocms_custom_content.apphooks.AppHookConfig` and its arguments
+
 **Declarations read by the framework**
 
 - the ``CMSConfig`` inner class and its options (see :doc:`index`)
