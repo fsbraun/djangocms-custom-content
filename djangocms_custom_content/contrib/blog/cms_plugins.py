@@ -17,5 +17,5 @@ class BlogPostTeaserPlugin(CMSPluginBase):
 
     def render(self, context, instance, placeholder):
         context = super().render(context, instance, placeholder)
-        context["post"] = instance.post
+        context["post"] = instance.post.get_content()
         return context

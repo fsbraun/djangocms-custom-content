@@ -15,6 +15,7 @@
 .tox/
 __pycache__/
 build/
+demo/
 dist/
 env/
 .venv/

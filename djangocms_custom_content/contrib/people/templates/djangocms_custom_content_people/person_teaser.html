@@ -1,7 +1,7 @@
 <div class="d-flex align-items-center p-4 border">
   <div class="flex-shrink-0">
     {% if person_content.visual %}
-        <img class="img-fluid rounded-circle mr-4" style="width: 120px; border: 8px solid #9B5DE5;" src="{{ person_content.visual.url }}" alt="{{ instance.name }}">
+        <img class="img-fluid rounded-circle mr-4" style="width: 120px; border: 8px solid #9B5DE5;" src="{{ person_content.visual.url }}" alt="{{ person_content.name }}">
     {% else %}
         <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" fill="currentColor" class="bi bi-person-circle" viewBox="0 0 16 16">
         <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>

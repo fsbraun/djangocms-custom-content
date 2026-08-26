@@ -17,5 +17,5 @@ class PersonTeaserPlugin(CMSPluginBase):
 
     def render(self, context, instance, placeholder):
         context = super().render(context, instance, placeholder)
-        context["personcontent"] = instance.person.get_content()
+        context["person_content"] = instance.person.get_content()
         return context
