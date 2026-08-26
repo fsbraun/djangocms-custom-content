@@ -171,6 +171,7 @@ report.exclude_lines = [
   "if 0:",
   "if self.debug:",
   "if settings.DEBUG",
+  "if TYPE_CHECKING:",
   "pragma: no cover",
   "raise AssertionError",
   "raise NotImplementedError",

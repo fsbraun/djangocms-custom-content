@@ -1,14 +1,17 @@
 """Tests for :class:`~djangocms_custom_content.apphooks.AppHookConfig`."""
 
+from types import SimpleNamespace
+
 import pytest
 from cms.apphook_pool import apphook_pool
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
-from django.test import TestCase
-from django.urls import path
+from django.test import TestCase, override_settings
+from django.urls import path, reverse
 from django.views.generic import TemplateView
 
 from djangocms_custom_content.apphooks import AppHookConfig
+from djangocms_custom_content.cms_config import _get_absolute_url_factory
 from djangocms_custom_content.contrib.people.models import Person, PersonContent
 from tests.test_app.models import SampleGrouperContent
 
@@ -159,3 +162,45 @@ class GeneratedUrlTests(TestCase):
         apphook = self.register(PersonContent, "Renamed", AppHookConfig(app_name="staff"), "person")
 
         self.assertEqual(apphook.app_name, "staff")
+
+
+@override_settings(ROOT_URLCONF="tests.urls_apphook_instances")
+class NamespaceReversalTests(TestCase):
+    """``namespace_field`` keeps links on the app hook page the object belongs to."""
+
+    def url_for(self, namespace, namespace_field="app_namespace"):
+        get_absolute_url = _get_absolute_url_factory(
+            "person", "slug", "detail", grouper_field_name="person", namespace_field=namespace_field
+        )
+        content = SimpleNamespace(slug="ada-lovelace", person=SimpleNamespace(app_namespace=namespace))
+        return get_absolute_url(content)
+
+    def test_reverses_into_the_instance_the_object_belongs_to(self):
+        self.assertEqual(self.url_for("board"), "/board/ada-lovelace/")
+        self.assertEqual(self.url_for("team"), "/team/ada-lovelace/")
+
+    @property
+    def unqualified(self):
+        """Where a plain ``reverse()`` lands when several instances exist.
+
+        Django resolves this deterministically but not necessarily to the page a
+        visitor is on — which is the whole reason ``namespace_field`` exists.
+        """
+        return reverse("person:detail", kwargs={"slug": "ada-lovelace"})
+
+    def test_empty_namespace_falls_back_to_the_unqualified_reversal(self):
+        self.assertEqual(self.url_for(""), self.unqualified)
+
+    def test_without_a_namespace_field_nothing_changes(self):
+        """Unset, behaviour is exactly what it was before the field existed."""
+        get_absolute_url = _get_absolute_url_factory("person", "slug", "detail")
+        content = SimpleNamespace(slug="ada-lovelace", person=SimpleNamespace(app_namespace="board"))
+
+        self.assertEqual(get_absolute_url(content), self.unqualified)
+
+    def test_the_unqualified_reversal_is_not_always_the_right_page(self):
+        """Guards the premise: if this ever became a no-op the feature would be moot."""
+        other = "/team/ada-lovelace/" if self.unqualified == "/board/ada-lovelace/" else "/board/ada-lovelace/"
+
+        self.assertNotEqual(self.unqualified, other)
+        self.assertEqual(self.url_for(other.strip("/").split("/")[0]), other)

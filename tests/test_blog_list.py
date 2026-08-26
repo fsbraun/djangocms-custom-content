@@ -43,6 +43,11 @@ class BlogListTestBase(TestCase):
         return instance
 
 
+class ModelTests(BlogListTestBase):
+    def test_str_is_the_verbose_name(self):
+        self.assertEqual(str(BlogPostList()), "Blog post list")
+
+
 class QuerysetTests(BlogListTestBase):
     def test_lists_published_posts(self):
         self.make_post("First", "first")
@@ -126,6 +131,12 @@ class PaginationTests(BlogListTestBase):
         context = self.render(self.plugin(page_size=2, pk=7), query="?page-7=2")
 
         self.assertEqual(context["querystring"], "")
+
+    def test_without_a_request_there_is_no_querystring(self):
+        """The plugin can be rendered outside a request cycle (a preview, a test)."""
+        from djangocms_custom_content.contrib.blog.cms_plugins import _querystring_without
+
+        self.assertEqual(_querystring_without(None, "page-1"), "")
 
     def test_plugin_is_not_cached(self):
         """Output depends on the query string, so caching would pin page one."""
