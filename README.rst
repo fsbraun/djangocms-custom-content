@@ -104,8 +104,9 @@ as-is or copy and adapt:
   versioned grouper without a language field) + "Person teaser" plugin
 * ``djangocms_custom_content.contrib.categories``: ``FlatCategory`` — a
   grouper-less taxonomy used as a relation target + "Category list" plugin
-* ``djangocms_custom_content.contrib.services``: a plain ``Service`` model +
-  "Service teaser" and "Featured services" plugins
+* ``djangocms_custom_content.contrib.services``: a versioned, frontend-editable
+  ``Service``/``ServiceContent`` pair + "Service teaser" and "Featured services"
+  plugins
 * ``djangocms_custom_content.contrib.blog``: blog posts with ordered ``authors``
   and ``categories`` relations + "Blog post" teaser plugin
 

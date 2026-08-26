@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load cms_tags %}
+{% block content %}
+<article class="container my-4">
+    <h1>{{ servicecontent.title }}</h1>
+
+    {% if servicecontent.summary %}<p class="lead">{{ servicecontent.summary }}</p>{% endif %}
+
+    {{ servicecontent.description|linebreaks }}
+
+    {% placeholder "service_details" %}
+</article>
+{% endblock %}

@@ -2,7 +2,7 @@ from cms.plugin_base import CMSPluginBase
 from cms.plugin_pool import plugin_pool
 from django.utils.translation import gettext_lazy as _
 
-from .models import FeaturedServices, Service, ServiceTeaser
+from .models import FeaturedServices, ServiceContent, ServiceTeaser
 
 
 @plugin_pool.register_plugin
@@ -17,7 +17,8 @@ class ServiceTeaserPlugin(CMSPluginBase):
 
     def render(self, context, instance, placeholder):
         context = super().render(context, instance, placeholder)
-        context["service"] = instance.service
+        # ``instance.service`` is the grouper; the template renders its content.
+        context["service"] = instance.service.get_content()
         return context
 
 
@@ -33,6 +34,7 @@ class FeaturedServicesPlugin(CMSPluginBase):
 
     def render(self, context, instance, placeholder):
         context = super().render(context, instance, placeholder)
-        qs = Service.objects.filter(is_featured=True)
+        # The default manager only yields published content when versioning is enabled.
+        qs = ServiceContent.objects.filter(is_featured=True)
         context["services"] = list(qs[: instance.limit])
         return context
