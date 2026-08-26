@@ -1,8 +1,10 @@
 from cms.models.fields import PlaceholderRelationField
 from cms.models.managers import ContentAdminManager, WithUserMixin
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.fields.reverse_related import ForeignObjectRel
 from django.utils.translation import get_language
+from django.utils.translation import gettext_lazy as _
 
 from djangocms_custom_content.helpers import get_custom_config
 
@@ -226,3 +228,51 @@ class AbstractCustomContent(CustomContentMixin, models.Model):
             object_meta.model_name,
             self.template_name_suffix,
         )
+
+    @classmethod
+    def has_slug_field(cls) -> bool:
+        return any(field.name == "slug" for field in cls._meta.get_fields())
+
+    @classmethod
+    def find_slug_conflicts(cls, slug: str | None, language: str | None = None, grouper_id=None) -> models.QuerySet:
+        """Content of *other* objects that already uses ``slug``.
+
+        A detail URL has to identify a single object, so a slug may be repeated
+        only within one grouper -- across its versions and, where the content has
+        a ``language`` field, across its translations.
+
+        Deliberately checks **every** version rather than only the current one: a
+        slug held by an archived version of another object comes back the moment
+        that version is reverted, and an ambiguous URL is worse than a rejected
+        one.
+        """
+        grouper_field_name = get_custom_config(cls)[1]
+        if not grouper_field_name or not cls.has_slug_field() or not slug:
+            return cls.admin_manager.none()
+
+        conflicts = cls.admin_manager.filter(slug=slug)
+        if language is not None and any(field.name == "language" for field in cls._meta.get_fields()):
+            conflicts = conflicts.filter(language=language)
+        if grouper_id is not None:
+            conflicts = conflicts.exclude(**{f"{grouper_field_name}_id": grouper_id})
+        return conflicts
+
+    @classmethod
+    def slug_conflict_message(cls) -> str:
+        return _("Another %(name)s already uses this slug.") % {"name": cls._meta.verbose_name}
+
+    def validate_unique(self, exclude=None) -> None:
+        """Reject a slug that another object already uses."""
+        super().validate_unique(exclude)
+        if exclude and "slug" in exclude:
+            return
+        grouper_field_name = get_custom_config(type(self))[1]
+        if not grouper_field_name:
+            return
+        conflicts = type(self).find_slug_conflicts(
+            getattr(self, "slug", None),
+            language=getattr(self, "language", None),
+            grouper_id=getattr(self, f"{grouper_field_name}_id", None),
+        )
+        if conflicts.exists():
+            raise ValidationError({"slug": self.slug_conflict_message()})

@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from cms.admin.utils import CONTENT_PREFIX
 from cms.utils.urlutils import admin_reverse
 from django.apps import apps
 from django.db import models
@@ -10,6 +11,35 @@ from djangocms_custom_content.relation_admin import RelationAdminMixin
 
 if TYPE_CHECKING:
     from django.contrib.admin import AdminSite
+
+
+class SlugUniquenessFormMixin:
+    """Reject a slug already used by another object, on the grouper change form.
+
+    The grouper form edits content fields under a ``content__`` prefix and never
+    runs the content model's own ``full_clean()``, so the model-level
+    :meth:`~djangocms_custom_content.models.AbstractCustomContent.validate_unique`
+    would not fire here. This repeats the check where the admin can attach the
+    error to the field the editor typed in.
+    """
+
+    def clean(self) -> dict:
+        cleaned_data = super().clean()
+        slug_field = CONTENT_PREFIX + "slug"
+        if slug_field not in cleaned_data or self.has_error(slug_field):
+            return cleaned_data
+
+        content_model = self._admin.content_model
+        language = cleaned_data.get(CONTENT_PREFIX + "language") or self._admin.current_content_filters.get("language")
+        conflicts = content_model.find_slug_conflicts(
+            cleaned_data[slug_field],
+            language=language,
+            # On the add view the grouper has no pk yet, so nothing is excluded.
+            grouper_id=self.instance.pk,
+        )
+        if conflicts.exists():
+            self.add_error(slug_field, content_model.slug_conflict_message())
+        return cleaned_data
 
 
 class CustomGrouperAdminMixin(RelationAdminMixin):
@@ -30,6 +60,20 @@ class CustomGrouperAdminMixin(RelationAdminMixin):
         admin_site: AdminSite
         model: type[models.Model]
         content_model: type[models.Model]
+
+    def get_form(self, request, obj=None, **kwargs):
+        """Add slug-uniqueness validation to the grouper change form.
+
+        Injected into the *base* form rather than wrapped around the finished one:
+        subclassing a built form re-runs ``ModelFormMetaclass``, which rebuilds
+        ``base_fields`` and would discard the autocomplete widgets
+        :class:`RelationAdminMixin` has already applied.
+        """
+        if self.content_model.has_slug_field():
+            base_form = kwargs.get("form", self.form)
+            if not (isinstance(base_form, type) and issubclass(base_form, SlugUniquenessFormMixin)):
+                kwargs["form"] = type("SlugUniquenessForm", (SlugUniquenessFormMixin, base_form), {})
+        return super().get_form(request, obj, **kwargs)
 
     def get_urls(self):
         """Register breadcrumb redirect URLs for grouper admin views."""
