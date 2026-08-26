@@ -67,6 +67,55 @@ class AbstractCustomGrouperInitializationTestCase(TestCase):
         self.assertEqual(result, content)
 
 
+class GrouperContentIsolationTestCase(TestCase):
+    """Each grouper must report its own content.
+
+    The related manager is bound to the instance it was read from, so caching one on the
+    grouper *class* made every grouper of that model report the first instantiated
+    grouper's content -- visible as wrong labels in relation (M2M) widgets and admin
+    columns.
+    """
+
+    def setUp(self):
+        """Two groupers of the same model, each with its own content."""
+        self.first = SampleGrouper.objects.create()
+        self.second = SampleGrouper.objects.create()
+        self.first_content = SampleGrouperContent.objects.create(grouper=self.first, title="First", language="en")
+        self.second_content = SampleGrouperContent.objects.create(grouper=self.second, title="Second", language="en")
+
+    def test_each_grouper_returns_its_own_content(self):
+        """Content lookups must not bleed between instances of the same model."""
+        self.assertEqual(self.first.get_content(language="en"), self.first_content)
+        self.assertEqual(self.second.get_content(language="en"), self.second_content)
+
+    def test_content_isolation_when_first_grouper_is_touched_first(self):
+        """Touching one grouper first must not fix the other one's content to it."""
+        self.first.get_content(language="en")
+
+        fresh = SampleGrouper.objects.get(pk=self.second.pk)
+        self.assertEqual(fresh.get_content(language="en"), self.second_content)
+
+    def test_content_isolation_across_a_queryset(self):
+        """Iterating a queryset must give every grouper its own content."""
+        contents = {grouper.pk: grouper.get_content(language="en") for grouper in SampleGrouper.objects.order_by("pk")}
+
+        self.assertEqual(contents[self.first.pk], self.first_content)
+        self.assertEqual(contents[self.second.pk], self.second_content)
+
+    def test_content_set_is_bound_to_its_own_instance(self):
+        """The related manager must belong to the instance it was read from."""
+        self.assertIsNot(self.first._content_set, self.second._content_set)
+        self.assertEqual(self.first._content_set.instance, self.first)
+        self.assertEqual(self.second._content_set.instance, self.second)
+
+    def test_unsaved_grouper_does_not_poison_saved_ones(self):
+        """An unsaved grouper (pk ``None``) must not become the model-wide content source."""
+        SampleGrouper()
+
+        fresh = SampleGrouper.objects.get(pk=self.first.pk)
+        self.assertEqual(fresh.get_content(language="en"), self.first_content)
+
+
 class GetContentMethodTestCase(TestCase):
     """Test case for AbstractCustomGrouper.get_content method."""
 
