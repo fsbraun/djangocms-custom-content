@@ -38,6 +38,13 @@ What gets generated
 
   The equivalent explicit reversal is ``{% url 'article:detail' slug=obj.slug %}``.
 
+.. note::
+
+   ``slug`` and ``language`` are read by the framework and carry rules of their
+   own — in particular a versioned ``slug`` must **not** be ``unique=True``, and
+   a ``language`` field makes the detail view resolve per language. See
+   :ref:`special-fields`.
+
 The template contract
 ---------------------
 

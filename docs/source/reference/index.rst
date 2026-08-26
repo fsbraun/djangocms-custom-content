@@ -46,6 +46,71 @@ Related setting:
 - ``CMS_SETTINGS_SHORTCUT`` (default ``True``) — show the settings-cog button for
   the current grouper in the toolbar.
 
+.. _special-fields:
+
+Special field names
+-------------------
+
+Two field names on a **content** model are read by the framework and change its
+behaviour. Both are optional; name a field one of these only when you mean it.
+
+``slug``
+~~~~~~~~
+
+Present, and the generated app hook routes on it —
+``<slug:slug>/`` instead of ``<int:pk>/`` — and the injected
+``get_absolute_url()`` builds the URL from it. Absent, and the detail URL uses
+the primary key.
+
+Because a detail URL has to identify a single object, a slug may be repeated only
+*within* one grouper — across its versions and, if the model also has a
+``language`` field, across its translations:
+
+.. code-block:: python
+
+    slug = models.SlugField(_("Slug"))    # not unique=True
+
+.. warning::
+
+   Do **not** declare ``unique=True`` on a versioned content model. Every version
+   is a row of its own and they all carry the same slug, so a database-level
+   unique constraint makes it impossible to create a second version.
+
+Uniqueness *across* objects is validated instead of constrained.
+:meth:`~djangocms_custom_content.models.AbstractCustomContent.validate_unique`
+rejects a slug another object already uses — counting **every** version, not just
+the current one, so a slug held by an archived version stays reserved and
+reverting that version can never introduce an ambiguous URL. The grouper admin
+repeats the check on its own form, where it can attach the error to the field the
+editor typed in.
+
+Should a duplicate reach the database anyway (an import, a data migration, a
+``QuerySet.update()``), the detail view does not raise: it serves the first match
+and logs an error naming the model, the slug and the pk it chose.
+
+``language``
+~~~~~~~~~~~~
+
+Present on a content model that has a grouper, and the content is treated as
+translatable:
+
+- ``language`` becomes an extra grouping field, so version history is kept
+  **per language** rather than per object;
+- the grouper admin grows language tabs and a language column;
+- the detail view filters by the active language, so a slug shared by an
+  object's own translations resolves to the right one.
+
+Add it as a plain character field — the framework reads the field, not a
+particular type:
+
+.. code-block:: python
+
+    language = models.CharField(_("Language"), max_length=8)
+
+Without this field a grouper has exactly one content object per version, which is
+the simpler shape; ``contrib.people`` and ``contrib.services`` are built that way,
+``contrib.blog`` has the field.
+
 Models
 ------
 
