@@ -4,10 +4,11 @@
 editing need the grouper/content pattern, so the fields move to a new ``ServiceContent``
 and ``Service`` becomes the stable identity that plugins point at.
 
-The field values of existing services are carried over. Where djangocms-versioning is
-installed, each migrated row also gets a published version, so services that were
-visible before the migration stay visible after it -- content without a version is
-excluded from both the frontend and the admin listings.
+The field values of existing services are carried over. Their *versions* are not created
+here: the ``Version`` table belongs to djangocms-versioning, and nothing orders that
+app's migrations before this one, so the table may not exist yet while this runs. A
+``post_migrate`` receiver (see ``handlers.py``) publishes the migrated content once every
+migration in the run has been applied.
 
 The migration is **not reversible**: unapplying it would re-add ``title`` and ``slug``
 to ``Service`` as ``NOT NULL`` columns with no default *before* a data migration could
@@ -22,11 +23,11 @@ import djangocms_custom_content.models
 
 
 def move_fields_to_content(apps, schema_editor):
-    """Copy each service's fields into a content object and version it."""
+    """Copy each service's fields onto a content object."""
     Service = apps.get_model("djangocms_custom_content_services", "Service")
     ServiceContent = apps.get_model("djangocms_custom_content_services", "ServiceContent")
 
-    contents = [
+    ServiceContent.objects.bulk_create(
         ServiceContent(
             service=service,
             title=service.title,
@@ -36,42 +37,7 @@ def move_fields_to_content(apps, schema_editor):
             is_featured=service.is_featured,
         )
         for service in Service.objects.all()
-    ]
-    if not contents:
-        return
-    ServiceContent.objects.bulk_create(contents)
-    _create_published_versions(list(ServiceContent.objects.values_list("pk", flat=True)))
-
-
-def _create_published_versions(content_pks):
-    """Give each migrated content object a published version.
-
-    Works on the real (not historical) models throughout: version numbering and the
-    state machine live on ``Version.save()``, and ``Version`` resolves its versionable
-    from the content class -- neither of which a ``__fake__`` historical model carries.
-    Silently does nothing when djangocms-versioning is not installed, or when the
-    database holds no user to attribute the version to; an unversioned content object is
-    a state django CMS already tolerates, and publishing it by hand is a single click.
-    """
-    from django.apps import apps as django_apps
-
-    if not django_apps.is_installed("djangocms_versioning"):
-        return
-
-    from django.contrib.auth import get_user_model
-    from djangocms_versioning import constants
-    from djangocms_versioning.models import Version
-
-    from djangocms_custom_content.contrib.services.models import ServiceContent
-
-    User = get_user_model()
-    author = User.objects.filter(is_superuser=True).order_by("pk").first() or User.objects.order_by("pk").first()
-    if author is None:
-        return
-
-    # ``_base_manager`` bypasses the published-only filter versioning installs on ``objects``.
-    for content in ServiceContent._base_manager.filter(pk__in=content_pks):
-        Version.objects.create(content=content, created_by=author, state=constants.PUBLISHED)
+    )
 
 
 class Migration(migrations.Migration):

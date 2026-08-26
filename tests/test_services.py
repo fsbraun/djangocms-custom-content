@@ -127,6 +127,74 @@ class ServiceVersioningConfigTests(ServicesTestBase):
         self.assertTrue(ServiceContent.admin_manager.filter(slug="consulting").exists())
 
 
+class ServiceVersionBackfillTests(ServicesTestBase):
+    """``handlers.backfill_service_versions`` publishes content the migration left over.
+
+    The data migration cannot create versions itself (the ``Version`` table may not exist
+    yet when it runs), so unversioned content is published from ``post_migrate`` instead.
+    """
+
+    def make_unversioned(self, title, slug):
+        """A content object as the data migration leaves it: no version."""
+        service = Service.objects.create()
+        return ServiceContent._base_manager.create(service=service, title=title, slug=slug, is_featured=True)
+
+    def test_backfill_publishes_unversioned_content(self):
+        from djangocms_versioning.constants import PUBLISHED
+        from djangocms_versioning.models import Version
+
+        from djangocms_custom_content.contrib.services.handlers import backfill_service_versions
+
+        content = self.make_unversioned("Migrated", "migrated")
+        self.assertFalse(ServiceContent.objects.filter(slug="migrated").exists())
+
+        backfill_service_versions(sender=None, verbosity=0)
+
+        version = Version.objects.filter_by_grouper(content.service).first()
+        self.assertIsNotNone(version)
+        self.assertEqual(version.state, PUBLISHED)
+        self.assertTrue(ServiceContent.objects.filter(slug="migrated").exists())
+
+    def test_backfill_is_idempotent(self):
+        from djangocms_versioning.models import Version
+
+        from djangocms_custom_content.contrib.services.handlers import backfill_service_versions
+
+        content = self.make_unversioned("Migrated", "migrated")
+        backfill_service_versions(sender=None, verbosity=0)
+        backfill_service_versions(sender=None, verbosity=0)
+
+        self.assertEqual(Version.objects.filter_by_grouper(content.service).count(), 1)
+
+    def test_backfill_leaves_already_versioned_content_alone(self):
+        from djangocms_versioning.models import Version
+
+        from djangocms_custom_content.contrib.services.handlers import backfill_service_versions
+
+        service = self.create_service("Consulting", "consulting")
+        before = Version.objects.filter_by_grouper(service).first()
+
+        backfill_service_versions(sender=None, verbosity=0)
+
+        versions = Version.objects.filter_by_grouper(service)
+        self.assertEqual(versions.count(), 1)
+        self.assertEqual(versions.first().pk, before.pk)
+
+    def test_backfill_warns_when_no_user_can_be_attributed(self):
+        """Without a user there is nothing to attribute a version to; warn, do not vanish."""
+        from djangocms_versioning.models import Version
+
+        from djangocms_custom_content.contrib.services.handlers import backfill_service_versions
+
+        content = self.make_unversioned("Migrated", "migrated")
+        User.objects.all().delete()
+
+        with self.assertWarnsRegex(RuntimeWarning, "no user exists"):
+            backfill_service_versions(sender=None, verbosity=0)
+
+        self.assertFalse(Version.objects.filter_by_grouper(content.service).exists())
+
+
 class ServiceTeaserPluginTests(ServicesTestBase):
     def test_render_puts_the_services_content_in_context(self):
         """The plugin points at the grouper but the template renders its content."""

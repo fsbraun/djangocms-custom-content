@@ -15,6 +15,16 @@ User = get_user_model()
 pytestmark = pytest.mark.django_db
 
 
+def content_pk_url_param(model):
+    """The GET parameter the grouper admin selects a content object with.
+
+    ``GrouperModelAdmin.content_pk_url_param`` only exists from django CMS 5.1; the
+    toolbar falls back to its value, so the tests use the same fallback rather than
+    assuming the attribute is there.
+    """
+    return getattr(admin_site._registry[model], "content_pk_url_param", "cms_content")
+
+
 class _FakeMenuItem:
     def __init__(self, name=None, identifier=None):
         self.name = name
@@ -308,11 +318,10 @@ class CustomContentToolbarTestCase(TestCase):
         toolbar = self.get_toolbar(self.person_content, self.superuser)
         toolbar.populate()
 
-        admin = admin_site._registry[Person]
         url = toolbar.get_settings_url()
 
         self.assertIn(f"/{self.person.pk}/change/", url)
-        self.assertIn(f"{admin.content_pk_url_param}={self.person_content.pk}", url)
+        self.assertIn(f"{content_pk_url_param(Person)}={self.person_content.pk}", url)
 
     def test_settings_url_distinguishes_content_objects_of_one_grouper(self):
         """Two content objects of the same grouper yield two different settings URLs."""
@@ -337,8 +346,7 @@ class CustomContentToolbarTestCase(TestCase):
         toolbar.populate()
         toolbar.content = None
 
-        admin = admin_site._registry[Person]
-        self.assertNotIn(admin.content_pk_url_param, toolbar.get_settings_url())
+        self.assertNotIn(content_pk_url_param(Person), toolbar.get_settings_url())
 
     def test_menu_settings_item_carries_the_shown_content_pk(self):
         """The menu item and the right-hand button use the same content-aware URL."""
@@ -347,9 +355,8 @@ class CustomContentToolbarTestCase(TestCase):
 
         menu = toolbar.toolbar.menus.get(f"custom-content-{self.person._meta.model_name}")
         settings_item = next(item for item in menu.items if hasattr(item, "url"))
-        admin = admin_site._registry[Person]
 
-        self.assertIn(f"{admin.content_pk_url_param}={self.person_content.pk}", settings_item.url)
+        self.assertIn(f"{content_pk_url_param(Person)}={self.person_content.pk}", settings_item.url)
 
     def test_add_shortcut_links(self):
         """Test that shortcut links are added to admin menu for all custom content types."""
