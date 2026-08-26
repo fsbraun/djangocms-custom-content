@@ -9,7 +9,7 @@ from .models import FeaturedServices, ServiceContent, ServiceTeaser
 class ServiceTeaserPlugin(CMSPluginBase):
     model = ServiceTeaser
     name = _("Service")
-    render_template = "djangocms_custom_content/contrib/services/service_teaser.html"
+    render_template = "djangocms_custom_content_services/service_teaser.html"
     cache = True
     allow_children = False
 
@@ -26,7 +26,7 @@ class ServiceTeaserPlugin(CMSPluginBase):
 class FeaturedServicesPlugin(CMSPluginBase):
     model = FeaturedServices
     name = _("Featured services")
-    render_template = "djangocms_custom_content/contrib/services/featured_services.html"
+    render_template = "djangocms_custom_content_services/featured_services.html"
     cache = True
     allow_children = False
 

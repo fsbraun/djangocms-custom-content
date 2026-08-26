@@ -1,11 +1,15 @@
-{% extends "base.html" %}{% load cms_tags %}
-
+{% extends "base.html" %}
+{% load cms_tags %}
 {% block content %}
 <article class="container my-4">
-    <h1>{{ instance.title }}</h1>
-    <p>Published on {{ instance.publish_date }}</p>
-    <hr>
-    {% placeholder "post_content" %}
+    <h1>{{ blogpostcontent.title }}</h1>
 
+    <p>Published on {{ blogpostcontent.published_at }}</p>
+
+    {% if blogpostcontent.excerpt %}<p class="lead">{{ blogpostcontent.excerpt }}</p>{% endif %}
+
+    {{ blogpostcontent.body|linebreaks }}
+
+    {% placeholder "post_content" %}
 </article>
 {% endblock %}

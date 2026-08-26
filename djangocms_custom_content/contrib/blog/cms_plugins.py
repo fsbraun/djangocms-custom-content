@@ -9,7 +9,7 @@ from .models import BlogPostTeaser
 class BlogPostTeaserPlugin(CMSPluginBase):
     model = BlogPostTeaser
     name = _("Blog post")
-    render_template = "djangocms_custom_content/contrib/blog/blog_post_teaser.html"
+    render_template = "djangocms_custom_content_blog/blog_post_teaser.html"
     cache = True
     allow_children = False
 

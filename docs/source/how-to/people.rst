@@ -99,10 +99,14 @@ What this app demonstrates
 
 ``Person`` is a **versioned grouper without a** ``language`` **field** — proof
 that versioning does not require multi-language content. It is also the canonical
-*target* of a relation (``BlogPost.authors``).
+*target* of a relation (``BlogPost.authors``), which makes its detail view the
+worked example for rendering a reverse relation: see
+:ref:`rendering-relations-in-a-detail-view` for listing the posts a person
+authored.
 
 See Also
 --------
 
 - :doc:`../how-to/m2m_relations` - M2M relations guide
+- :ref:`rendering-relations-in-a-detail-view` - Listing a person's blog posts
 - :doc:`../tutorials/model_with_m2m` - Tutorial with Person example

@@ -9,7 +9,7 @@ from .models import FlatCategory, FlatCategoryList
 class CategoryListPlugin(CMSPluginBase):
     model = FlatCategoryList
     name = _("Categories")
-    render_template = "djangocms_custom_content/contrib/categories/category_list.html"
+    render_template = "djangocms_custom_content_categories/category_list.html"
     cache = True
     allow_children = False
 

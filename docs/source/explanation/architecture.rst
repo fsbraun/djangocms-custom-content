@@ -96,9 +96,12 @@ template under its **model name** (``articlecontent``). The ``_detail`` part is
 and the same default serves both the app-hook detail view and the frontend
 editor — one template covers both.
 
+All four bundled contrib apps follow this convention rather than overriding it,
+so ``BlogPostContent`` in ``djangocms_custom_content.contrib.blog`` renders from
+``djangocms_custom_content_blog/blogpostcontent_detail.html``.
+
 Need a different template? Override
-:meth:`~djangocms_custom_content.models.AbstractCustomContent.get_template` (the
-bundled blog returns ``"blog/detail.html"``):
+:meth:`~djangocms_custom_content.models.AbstractCustomContent.get_template`:
 
 .. code-block:: python
 
@@ -109,6 +112,31 @@ bundled blog returns ``"blog/detail.html"``):
 The :doc:`../how-to/apphooks` guide spells out the full contract — which context
 variables each render path provides, and how an override interacts with the
 app-hook view.
+
+Overriding a bundled template
+-----------------------------
+
+Every template the contrib apps ship lives inside the app that uses it, in a
+directory named after that app's **label**:
+
+.. code-block:: text
+
+    contrib/blog/templates/djangocms_custom_content_blog/
+    contrib/categories/templates/djangocms_custom_content_categories/
+    contrib/people/templates/djangocms_custom_content_people/
+    contrib/services/templates/djangocms_custom_content_services/
+
+Because the label prefixes the path, nothing a bundled app ships can collide
+with a template of your own — and overriding one is the ordinary Django move:
+put a file at the same path in a directory that the loader reaches first,
+usually your project's ``DIRS`` entry.
+
+.. code-block:: text
+
+    myproject/templates/djangocms_custom_content_blog/blog_post_teaser.html
+
+That replaces the bundled blog teaser everywhere the plugin renders, without
+touching the package or subclassing the plugin.
 
 Not everything needs a grouper
 ------------------------------
