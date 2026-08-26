@@ -5,9 +5,10 @@ from cms.cms_toolbars import (
 from cms.toolbar.items import Break
 from cms.toolbar_base import CMSToolbar
 from cms.toolbar_pool import toolbar_pool
-from cms.utils.urlutils import admin_reverse
+from cms.utils.urlutils import add_url_parameters, admin_reverse
 from django.apps import apps
 from django.conf import settings
+from django.contrib.admin import site as admin_site
 from django.utils.encoding import force_str
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -22,6 +23,9 @@ class CustomContentToolbar(CMSToolbar):
 
     class Media:
         css = {"all": ("djangocms_custom_content/icon.css",)}
+
+    #: The content object currently shown, set by :meth:`populate`.
+    content = None
 
     @classmethod
     def get_insert_position(cls, admin_menu, item_name):
@@ -85,6 +89,23 @@ class CustomContentToolbar(CMSToolbar):
                     position=self.get_insert_position(admin_menu, name),
                 )
 
+    def get_settings_url(self) -> str:
+        """Return the grouper change URL for the content object currently shown.
+
+        The grouper change view edits the *latest* content object unless a specific
+        one is requested by primary key. Without that parameter the settings modal
+        would always open the draft, even while a published (read-only) version is
+        being viewed -- the form would then wrongly offer its fields for editing.
+        """
+        url = admin_reverse(
+            f"{self.grouper._meta.app_label}_{self.grouper._meta.model_name}_change", args=(self.grouper.pk,)
+        )
+        if self.content is None or self.content.pk is None:
+            return url
+        admin = admin_site._registry.get(self.grouper.__class__)
+        param = getattr(admin, "content_pk_url_param", "cms_content")
+        return add_url_parameters(url, **{param: self.content.pk})
+
     def add_content_object_menu(self):
         """Add menu entries for the current grouper instance."""
         # Get verbose name from the grouper model
@@ -105,10 +126,7 @@ class CustomContentToolbar(CMSToolbar):
         can_view = user.has_perm(f"{model._meta.app_label}.view_{model._meta.model_name}")
 
         # Add Settings item (change view in modal)
-        change_url = admin_reverse(
-            f"{self.grouper._meta.app_label}_{self.grouper._meta.model_name}_change", args=(self.grouper.pk,)
-        )
-        menu.add_modal_item(_("%s settings") % menu_name, url=change_url, disabled=not can_change)
+        menu.add_modal_item(_("%s settings") % menu_name, url=self.get_settings_url(), disabled=not can_change)
         menu.add_break()
 
         # Add Add item (add view in modal)
@@ -133,17 +151,15 @@ class CustomContentToolbar(CMSToolbar):
         self.grouper = getattr(content, self.config.custom_content_groupers[content.__class__][1], None)
         if not self.grouper:
             return
+        self.content = content
 
         self.add_content_object_menu()
 
         # Add a settings icon button to the right toolbar if enabled
         if getattr(settings, "CMS_SETTINGS_SHORTCUT", True):
-            url = admin_reverse(
-                f"{self.grouper._meta.app_label}_{self.grouper._meta.model_name}_change", args=(self.grouper.pk,)
-            )
             self.toolbar.add_modal_button(
                 mark_safe("<span class='cms-icon cms-icon-settings'></span>"),
-                url=url,
+                url=self.get_settings_url(),
                 side=self.toolbar.RIGHT,
             )
 

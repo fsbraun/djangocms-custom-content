@@ -1,6 +1,7 @@
 import pytest
 from cms.cms_toolbars import ADMIN_MENU_IDENTIFIER, ADMINISTRATION_BREAK
 from cms.toolbar.toolbar import CMSToolbar as ToolbarClass
+from django.contrib.admin import site as admin_site
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import RequestFactory, TestCase, override_settings
@@ -297,6 +298,58 @@ class CustomContentToolbarTestCase(TestCase):
         # Check changelist URL
         changelist_url = items[2].url
         self.assertIn("/blogpost/", changelist_url)
+
+    def test_settings_url_carries_the_shown_content_pk(self):
+        """The settings URL must identify the content object the toolbar is on.
+
+        Without it the grouper change view falls back to the *latest* content, so a
+        published (read-only) version and its newer draft would open the same form.
+        """
+        toolbar = self.get_toolbar(self.person_content, self.superuser)
+        toolbar.populate()
+
+        admin = admin_site._registry[Person]
+        url = toolbar.get_settings_url()
+
+        self.assertIn(f"/{self.person.pk}/change/", url)
+        self.assertIn(f"{admin.content_pk_url_param}={self.person_content.pk}", url)
+
+    def test_settings_url_distinguishes_content_objects_of_one_grouper(self):
+        """Two content objects of the same grouper yield two different settings URLs."""
+        other_content = PersonContent.objects.with_user(self.superuser).create(
+            person=self.person,
+            name="John Doe",
+            role="Developer",
+            description="Test bio",
+            slug="john-doe",
+        )
+
+        first = self.get_toolbar(self.person_content, self.superuser)
+        first.populate()
+        second = self.get_toolbar(other_content, self.superuser)
+        second.populate()
+
+        self.assertNotEqual(first.get_settings_url(), second.get_settings_url())
+
+    def test_settings_url_without_content_falls_back_to_grouper(self):
+        """With no content object the plain grouper change URL is used."""
+        toolbar = self.get_toolbar(self.person_content, self.superuser)
+        toolbar.populate()
+        toolbar.content = None
+
+        admin = admin_site._registry[Person]
+        self.assertNotIn(admin.content_pk_url_param, toolbar.get_settings_url())
+
+    def test_menu_settings_item_carries_the_shown_content_pk(self):
+        """The menu item and the right-hand button use the same content-aware URL."""
+        toolbar = self.get_toolbar(self.person_content, self.superuser)
+        toolbar.populate()
+
+        menu = toolbar.toolbar.menus.get(f"custom-content-{self.person._meta.model_name}")
+        settings_item = next(item for item in menu.items if hasattr(item, "url"))
+        admin = admin_site._registry[Person]
+
+        self.assertIn(f"{admin.content_pk_url_param}={self.person_content.pk}", settings_item.url)
 
     def test_add_shortcut_links(self):
         """Test that shortcut links are added to admin menu for all custom content types."""
