@@ -166,3 +166,8 @@ Helpers
 -------
 
 .. autofunction:: djangocms_custom_content.helpers.get_custom_config
+
+.. toctree::
+   :maxdepth: 1
+
+   api_stability

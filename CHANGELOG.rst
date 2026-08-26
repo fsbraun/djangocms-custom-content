@@ -79,6 +79,19 @@ Added
 Fixed
 -----
 
+* **A translated object broke its own detail view.** The generated app hook's
+  detail view never narrowed by language, so a content model with a ``language``
+  field matched its own translations and raised ``MultipleObjectsReturned``. The
+  view now filters by the active language.
+* **Duplicate slugs across objects returned a server error**
+  (`#20 <https://github.com/fsbraun/djangocms-custom-content/issues/20>`_). A
+  slug now has to identify a single object:
+  :meth:`~djangocms_custom_content.models.AbstractCustomContent.validate_unique`
+  and the grouper admin form reject a slug another object already uses, counting
+  every version rather than only the current one. A slug may still be repeated
+  within one object, across its versions and translations. Should a duplicate
+  reach the database regardless, the detail view serves the first match and logs
+  an error instead of raising. See :ref:`special-fields`.
 * **Groupers returned the wrong content.** ``AbstractCustomGrouper`` cached the
   related manager on the *class*, so every grouper of a model reported the
   content of the first one instantiated in the process — visible as wrong labels

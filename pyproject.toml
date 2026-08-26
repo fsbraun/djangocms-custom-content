@@ -12,7 +12,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Framework :: Django",
   "Framework :: Django :: 5.2",
   "Framework :: Django :: 6.0",
@@ -29,14 +29,21 @@ classifiers = [
 ]
 dynamic = [ "version" ]
 dependencies = [
+  # 5.0 is supported; 5.1 adds GrouperModelAdmin.content_pk_url_param, without
+  # which the toolbar settings link cannot name the version being viewed and
+  # falls back to editing the latest content.
   "django-cms>=5",
 ]
 optional-dependencies.test = [
-  "djangocms-versioning",
+  "djangocms-custom-content[versioning]",
   "pre-commit>=3",
   "pytest>=7",
   "pytest-cov>=5",
   "pytest-django>=4",
+]
+# Versioning is optional, but ``enable_versioning`` needs it.
+optional-dependencies.versioning = [
+  "djangocms-versioning>=2.3",
 ]
 urls.Documentation = "https://djangocms-custom-content.readthedocs.io"
 urls.Issues = "https://github.com/fsbraun/djangocms-custom-content/issues"

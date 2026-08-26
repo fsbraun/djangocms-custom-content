@@ -113,6 +113,8 @@ The :doc:`../how-to/apphooks` guide spells out the full contract — which conte
 variables each render path provides, and how an override interacts with the
 app-hook view.
 
+.. _overriding-a-bundled-template:
+
 Overriding a bundled template
 -----------------------------
 
