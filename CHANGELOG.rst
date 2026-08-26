@@ -65,6 +65,21 @@ Breaking changes
 Added
 -----
 
+* **``CMSConfig.apphook`` accepts an**
+  :class:`~djangocms_custom_content.apphooks.AppHookConfig`, supplying a detail
+  view, extra URL patterns, the routing field, an application namespace and an
+  optional list view. ``apphook = True`` is unchanged shorthand for the defaults,
+  so existing app hooks keep working.
+* **No list view is generated for an app hook root, by design.** The root is an
+  ordinary CMS page, so the index belongs to a list plugin an editor can arrange
+  alongside anything else on that page. The framework ships no such plugin — it
+  would need a concrete model and a migration, and what to list is an application
+  decision — but ``contrib.blog`` now carries a complete worked example,
+  ``BlogPostListPlugin``, including pagination. See :ref:`apphook-root-page`.
+* **More than one app hook page.** ``AppHookConfig(namespace_field=...)`` names a
+  field on the grouper holding the app hook instance an object belongs to, so
+  ``get_absolute_url()`` reverses with ``current_app`` and links stay on the page
+  the visitor is on. Unset, behaviour is unchanged.
 * ``admin_menu = True`` on a content model's ``CMSConfig`` adds a shortcut to its
   changelist in the toolbar's admin menu. Grouper-backed content links to the
   grouper changelist; plain content such as ``FlatCategory`` links to its own.
@@ -79,6 +94,11 @@ Added
 Fixed
 -----
 
+* **A slugless app hook crashed at startup.** ``register_apphook`` tested for a
+  slug field with ``_meta.get_field("slug") is not None``, which raises rather
+  than returning ``None``, so the primary-key routing branch was unreachable. A
+  content model with ``apphook = True`` and no ``slug`` now routes on ``<int:pk>/``
+  as documented.
 * **A translated object broke its own detail view.** The generated app hook's
   detail view never narrowed by language, so a content model with a ``language``
   field matched its own translations and raised ``MultipleObjectsReturned``. The
