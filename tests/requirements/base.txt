@@ -11,4 +11,4 @@ black
 pre-commit
 django-filer
 djangocms-versioning @ git+https://github.com/django-cms/djangocms-versioning
--e .[versioning]
+-e .[djangocms-versioning]

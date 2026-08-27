@@ -7,7 +7,7 @@ All notable changes to this project are documented here. Versions follow
 minor bump may still carry breaking changes.
 
 
-0.6.0 (2026-08-26)
+0.9.0 (2026-08-27)
 ==================
 
 Breaking changes
@@ -44,9 +44,21 @@ Breaking changes
   fields moved to a new versioned ``ServiceContent``. Code reading
   ``service.title`` must go through ``service.get_content().title``, and
   ``ServiceContent.slug`` is no longer unique (versions of one service share a
-  slug). Shipped as a single squashed ``0001_initial``, so an existing
-  installation of the previous schema has no upgrade path — this example app had
-  no releases in the wild.
+  slug).
+
+  It ships as a single ``0001_initial``, replacing the one 0.5.0 shipped. A
+  database that installed the 0.5.0 app therefore has that migration recorded
+  already and skips the new one — ``migrate`` reports *"No migrations to apply"*
+  and the app then fails with ``no such table: ..._servicecontent``.
+
+  **If you used ``contrib.services`` from 0.5.0, copy that app into your own
+  project** rather than upgrading to this one. Take the 0.5.0 ``models.py``,
+  ``admin.py``, ``cms_plugins.py`` and ``migrations/``, and keep your rows where
+  they are by setting ``Meta.db_table`` to the original table name. Your services
+  keep working, unchanged, and are yours to evolve.
+
+  This is the **only** such break. From 0.9.0 the contrib apps carry a migration
+  continuity promise — see :doc:`../reference/api_stability`.
 
 * ``BlogPostContent.get_template()`` was removed. The renamed detail template now
   matches the default ``{app_label}/{model_name}_detail.html`` convention, which

@@ -148,7 +148,9 @@ plugins — no models written. Poke at it, then build your own.
   model (:doc:`how-to/versioning`)
 * **Batteries included** — bundled blog, people, categories and services apps to
   use as-is or copy and adapt (:doc:`how-to/blog`)
-* **django CMS 5.0+** — compatible with modern django CMS and Django versions
+* **Current django CMS** — see the badges on `PyPI
+  <https://pypi.python.org/pypi/djangocms-custom-content>`_ for the supported
+  django CMS, Django and Python releases
 
 
 Contents

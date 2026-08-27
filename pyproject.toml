@@ -34,16 +34,17 @@ dependencies = [
   # falls back to editing the latest content.
   "django-cms>=5",
 ]
+# Named after the package it installs: versioning is optional, and
+# djangocms-versioning is one implementation of it rather than the concept.
+optional-dependencies.djangocms-versioning = [
+  "djangocms-versioning>=2.3",
+]
 optional-dependencies.test = [
-  "djangocms-custom-content[versioning]",
+  "djangocms-custom-content[djangocms-versioning]",
   "pre-commit>=3",
   "pytest>=7",
   "pytest-cov>=5",
   "pytest-django>=4",
-]
-# Versioning is optional, but ``enable_versioning`` needs it.
-optional-dependencies.versioning = [
-  "djangocms-versioning>=2.3",
 ]
 urls.Documentation = "https://djangocms-custom-content.readthedocs.io"
 urls.Issues = "https://github.com/fsbraun/djangocms-custom-content/issues"
