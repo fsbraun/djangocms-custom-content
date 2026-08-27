@@ -37,7 +37,8 @@ Write this…
 
 * per-language draft/publish version history
 * frontend, double-click editing inside the page
-* a detail view at a clean URL, with ``get_absolute_url()`` injected
+* a detail view at a clean URL, with ``get_absolute_url()`` injected — swap in
+  your own view or add extra URLs when you outgrow the default
 * a grouper admin to create and manage content
 
 Want related content? Add **one line** to the grouper —
@@ -47,9 +48,11 @@ version.
 
 .. note::
 
-    **Status: 0.5 — usable, pre-1.0.** The relations system is a ground-up rewrite
-    and the framework runs the bundled apps and test suite, but APIs may still
-    shift before 1.0. Feedback and bug reports are very welcome.
+    **Status: 0.9 — usable, pre-1.0.** The public API is settled and written down
+    (see `API stability
+    <https://djangocms-custom-content.readthedocs.io/en/latest/reference/api_stability.html>`_),
+    but a ``0.x`` minor release may still carry a breaking change — the changelog
+    says so when it does. Feedback and bug reports are very welcome.
 
 Why you'll want it
 ==================
@@ -64,16 +67,19 @@ Why you'll want it
   key or migration on the target model.
 * **Multi-language & versioned** — per-language draft/publish history per content
   model.
-* **Batteries included** — bundled blog, people, categories and services apps to
-  use as-is or copy and adapt.
-* **django CMS 5.0+** — supports django CMS 5.0 and later and Django 5.2 to 6.0.
+* **Batteries included** — complete blog, people, categories and services apps,
+  supported and migrated, to install as-is or read and adapt.
+* **Current django CMS and Django** — see the badges above for the supported
+  releases.
 
 See it work in two minutes
 ==========================
 
 Don't build anything yet — turn on a bundled example and click around first::
 
-    pip install djangocms-custom-content
+    pip install djangocms-custom-content[djangocms-versioning]
+
+(Versioning is optional; drop the extra if you don't want draft/publish history.)
 
 Add the blog (plus the apps it relates to) to ``INSTALLED_APPS`` and migrate::
 
@@ -93,29 +99,32 @@ written. Then build your own by following the documentation:
 
 https://djangocms-custom-content.readthedocs.io/
 
-Contrib examples
-================
+Bundled apps
+============
 
-This package ships optional, small example apps under ``djangocms_custom_content.contrib``.
-They are quick starting points (models + admin + django CMS plugins) you can enable
-as-is or copy and adapt:
+``djangocms_custom_content.contrib`` ships complete, installable applications
+(models + admin + django CMS plugins). Install and rely on them, or read them as
+worked examples and adapt — either way their schema changes arrive as migrations
+that upgrade an existing database:
 
 * ``djangocms_custom_content.contrib.people``: ``Person`` grouper/content (a
-  versioned grouper without a language field) + "Person teaser" plugin
+  versioned grouper without a language field) + "Person teaser" plugin, and an
+  app hook giving every person a detail URL
 * ``djangocms_custom_content.contrib.categories``: ``FlatCategory`` — a
   grouper-less taxonomy used as a relation target + "Category list" plugin
 * ``djangocms_custom_content.contrib.services``: a versioned, frontend-editable
   ``Service``/``ServiceContent`` pair + "Service teaser" and "Featured services"
   plugins
 * ``djangocms_custom_content.contrib.blog``: blog posts with ordered ``authors``
-  and ``categories`` relations + "Blog post" teaser plugin
+  and ``categories`` relations + "Blog post" teaser and a paginated
+  "Blog post list" plugin
 
 To enable one (or more), add the module(s) to ``INSTALLED_APPS`` and run migrations::
 
     INSTALLED_APPS = [
         ...,
         'djangocms_custom_content',
-        'djangocms_custom_content.contrib.people',  # contrib are optional
+        'djangocms_custom_content.contrib.people',  # each app is optional
         'djangocms_custom_content.contrib.services',
         'djangocms_custom_content.contrib.categories',
         'djangocms_custom_content.contrib.blog',
