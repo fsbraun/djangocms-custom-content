@@ -51,3 +51,42 @@ class BlogPostTeaser(CMSPlugin):
 
     class Meta:
         verbose_name = _("Blog post teaser")
+
+
+class BlogPostList(CMSPlugin):
+    """A paginated index of published posts.
+
+    The app hook generates no list view, so the page it is attached to stays an
+    ordinary CMS page and this plugin builds the index on it -- alongside whatever
+    else an editor wants there. It works on any page, not only the app hook root.
+    """
+
+    page_size = models.PositiveIntegerField(
+        _("Posts per page"),
+        default=10,
+        help_text=_("0 shows every post on one page."),
+    )
+    only_featured = models.BooleanField(_("Only featured"), default=False)
+
+    class Meta:
+        verbose_name = _("Blog post list")
+        verbose_name_plural = _("Blog post lists")
+
+    def __str__(self):
+        return str(self._meta.verbose_name)
+
+    @property
+    def page_kwarg(self) -> str:
+        """Query parameter holding the page number.
+
+        Namespaced by primary key so two list plugins on one page paginate
+        independently.
+        """
+        return f"page-{self.pk}" if self.pk else "page"
+
+    def get_queryset(self) -> models.QuerySet:
+        """Published posts, newest first (the model's own ordering)."""
+        queryset = BlogPostContent.objects.all()
+        if self.only_featured:
+            queryset = queryset.filter(is_featured=True)
+        return queryset

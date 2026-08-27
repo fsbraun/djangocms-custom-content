@@ -39,6 +39,10 @@ any release.
 - :class:`djangocms_custom_content.admin.CustomGrouperAdminMixin`
 - :class:`djangocms_custom_content.forms.RelationModelForm`
 
+**App hooks**
+
+- :class:`djangocms_custom_content.apphooks.AppHookConfig` and its arguments
+
 **Declarations read by the framework**
 
 - the ``CMSConfig`` inner class and its options (see :doc:`index`)
@@ -87,42 +91,59 @@ From 1.0 onwards:
 The ``contrib`` apps
 --------------------
 
-``djangocms_custom_content.contrib.*`` holds **example applications**. They exist
-to be read and copied, not to be depended on:
+``djangocms_custom_content.contrib.*`` ships **complete applications**, not
+sketches. They double as worked examples of the framework, but they are meant to
+be installed and relied on:
 
-- their models, migrations, templates and admin classes may change or be removed
-  in any release;
-- migrations may be squashed without an upgrade path;
-- they are not covered by the deprecation policy.
+- their models, plugins, templates and admin classes are covered by the
+  deprecation policy above;
+- **migrations are a continuity promise.** Every schema change arrives as a
+  migration that upgrades an existing installation, with its data. Migrations are
+  not squashed in a way that strands a database;
+- their template paths are public, so overrides keep working (see
+  :ref:`overriding-a-bundled-template`).
 
-If you want a blog, a people directory or a service list in production, copy the
-app into your own project and own it there. What *is* covered is the framework the
-examples are built on — the model bases, relations and ``CMSConfig`` options.
+Copying an app into your own project remains a perfectly good way to start from
+one — the framework underneath is what makes that easy — but you do not have to.
+
+.. note::
+
+   The continuity promise starts at **0.9.0**. One earlier change does not honour
+   it: ``contrib.services`` was reshaped from a plain model into a grouper/content
+   pair and re-issued as a single ``0001_initial``, which a database that
+   installed the 0.5.0 app silently skips. If that is you, copy the 0.5.0 services
+   app into your own project rather than upgrading to this one — see the 0.9.0
+   entry in :doc:`../changelog`. There are no other such breaks.
 
 Supported versions
 ------------------
 
-A release supports the combinations it is tested against in CI:
+A release supports the combinations it is tested against in CI. Rather than
+repeat them here, where they would drift out of date, the badges below read the
+released package's own metadata:
 
-.. list-table::
-   :header-rows: 1
+|PyVersion| |DjVersion| |CmsVersion|
 
-   * - Dependency
-     - Supported
-   * - Python
-     - 3.10 – 3.14
-   * - Django
-     - 5.2, 6.0, 6.1
-   * - django CMS
-     - 5.0, 5.1
-   * - djangocms-versioning
-     - 2.3+ (optional; required by ``enable_versioning``)
+.. |PyVersion| image:: https://img.shields.io/pypi/pyversions/djangocms-custom-content?style=flat-square&label=Python
+    :target: https://pypi.python.org/pypi/djangocms-custom-content
+    :alt: Supported Python versions
 
-Install the versioning support with the extra:
+.. |DjVersion| image:: https://img.shields.io/pypi/frameworkversions/django/djangocms-custom-content?style=flat-square&label=Django
+    :target: https://pypi.python.org/pypi/djangocms-custom-content
+    :alt: Supported Django versions
+
+.. |CmsVersion| image:: https://img.shields.io/pypi/frameworkversions/django-cms/djangocms-custom-content?style=flat-square&label=django%20CMS
+    :target: https://pypi.python.org/pypi/djangocms-custom-content
+    :alt: Supported django CMS versions
+
+``djangocms-versioning`` is an optional dependency — the versioning package
+``enable_versioning`` integrates with. The extra is named after the package
+rather than after the feature, since versioning is a concept and this is one
+implementation of it:
 
 .. code-block:: bash
 
-    pip install djangocms-custom-content[versioning]
+    pip install djangocms-custom-content[djangocms-versioning]
 
 Dropping a Python, Django or django CMS version is a **minor** release change and
 is announced in the changelog. Adding support for a new one is not breaking and
@@ -130,9 +151,9 @@ may happen in any release.
 
 .. note::
 
-   On django CMS 5.0 one feature degrades rather than failing: the toolbar's
-   settings link cannot name the version being viewed, because
-   ``GrouperModelAdmin.content_pk_url_param`` only exists from 5.1. The link
-   opens the **latest** content instead, which is the behaviour 5.0 has always
-   had. Everything else is supported identically, and the test suite runs against
-   both.
+   On the oldest supported django CMS one feature degrades rather than failing.
+   The toolbar's settings link cannot name the version being viewed, because
+   ``GrouperModelAdmin.content_pk_url_param`` was added later; the link opens the
+   **latest** content instead, which is what that release has always done.
+   Everything else behaves identically, and the test suite runs against every
+   supported release.

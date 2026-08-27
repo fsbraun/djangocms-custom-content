@@ -1,0 +1,34 @@
+{% comment %}
+Paginated index of published posts. Page links carry ``page-<plugin pk>`` so two
+list plugins on one page paginate independently, and preserve any other query
+parameters already on the URL.
+{% endcomment %}
+<div class="dcc-blogposts">
+  {% for post in posts %}
+    <article class="dcc-blogpost">
+      <h3 class="dcc-blogpost__title">
+        {% if post.get_absolute_url %}
+          <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+        {% else %}
+          {{ post.title }}
+        {% endif %}
+      </h3>
+      <p class="dcc-blogpost__date">{{ post.published_at|date:"DATE_FORMAT" }}</p>
+      {% if post.excerpt %}<div class="dcc-blogpost__excerpt">{{ post.excerpt }}</div>{% endif %}
+    </article>
+  {% empty %}
+    <div class="dcc-blogposts__empty">No posts.</div>
+  {% endfor %}
+
+  {% if page_obj and page_obj.has_other_pages %}
+    <nav class="dcc-pagination" aria-label="Blog post pages">
+      {% if page_obj.has_previous %}
+        <a class="dcc-pagination__prev" href="?{{ querystring }}{{ page_kwarg }}={{ page_obj.previous_page_number }}">Previous</a>
+      {% endif %}
+      <span class="dcc-pagination__status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a class="dcc-pagination__next" href="?{{ querystring }}{{ page_kwarg }}={{ page_obj.next_page_number }}">Next</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+</div>

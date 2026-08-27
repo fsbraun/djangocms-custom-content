@@ -7,7 +7,7 @@ All notable changes to this project are documented here. Versions follow
 minor bump may still carry breaking changes.
 
 
-0.6.0 (2026-08-26)
+0.9.0 (2026-08-27)
 ==================
 
 Breaking changes
@@ -44,9 +44,21 @@ Breaking changes
   fields moved to a new versioned ``ServiceContent``. Code reading
   ``service.title`` must go through ``service.get_content().title``, and
   ``ServiceContent.slug`` is no longer unique (versions of one service share a
-  slug). Shipped as a single squashed ``0001_initial``, so an existing
-  installation of the previous schema has no upgrade path — this example app had
-  no releases in the wild.
+  slug).
+
+  It ships as a single ``0001_initial``, replacing the one 0.5.0 shipped. A
+  database that installed the 0.5.0 app therefore has that migration recorded
+  already and skips the new one — ``migrate`` reports *"No migrations to apply"*
+  and the app then fails with ``no such table: ..._servicecontent``.
+
+  **If you used ``contrib.services`` from 0.5.0, copy that app into your own
+  project** rather than upgrading to this one. Take the 0.5.0 ``models.py``,
+  ``admin.py``, ``cms_plugins.py`` and ``migrations/``, and keep your rows where
+  they are by setting ``Meta.db_table`` to the original table name. Your services
+  keep working, unchanged, and are yours to evolve.
+
+  This is the **only** such break. From 0.9.0 the contrib apps carry a migration
+  continuity promise — see :doc:`../reference/api_stability`.
 
 * ``BlogPostContent.get_template()`` was removed. The renamed detail template now
   matches the default ``{app_label}/{model_name}_detail.html`` convention, which
@@ -65,6 +77,21 @@ Breaking changes
 Added
 -----
 
+* **``CMSConfig.apphook`` accepts an**
+  :class:`~djangocms_custom_content.apphooks.AppHookConfig`, supplying a detail
+  view, extra URL patterns, the routing field, an application namespace and an
+  optional list view. ``apphook = True`` is unchanged shorthand for the defaults,
+  so existing app hooks keep working.
+* **No list view is generated for an app hook root, by design.** The root is an
+  ordinary CMS page, so the index belongs to a list plugin an editor can arrange
+  alongside anything else on that page. The framework ships no such plugin — it
+  would need a concrete model and a migration, and what to list is an application
+  decision — but ``contrib.blog`` now carries a complete worked example,
+  ``BlogPostListPlugin``, including pagination. See :ref:`apphook-root-page`.
+* **More than one app hook page.** ``AppHookConfig(namespace_field=...)`` names a
+  field on the grouper holding the app hook instance an object belongs to, so
+  ``get_absolute_url()`` reverses with ``current_app`` and links stay on the page
+  the visitor is on. Unset, behaviour is unchanged.
 * ``admin_menu = True`` on a content model's ``CMSConfig`` adds a shortcut to its
   changelist in the toolbar's admin menu. Grouper-backed content links to the
   grouper changelist; plain content such as ``FlatCategory`` links to its own.
@@ -79,6 +106,11 @@ Added
 Fixed
 -----
 
+* **A slugless app hook crashed at startup.** ``register_apphook`` tested for a
+  slug field with ``_meta.get_field("slug") is not None``, which raises rather
+  than returning ``None``, so the primary-key routing branch was unreachable. A
+  content model with ``apphook = True`` and no ``slug`` now routes on ``<int:pk>/``
+  as documented.
 * **A translated object broke its own detail view.** The generated app hook's
   detail view never narrowed by language, so a content model with a ``language``
   field matched its own translations and raised ``MultipleObjectsReturned``. The

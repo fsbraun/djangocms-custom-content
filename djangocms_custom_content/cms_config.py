@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 
 from cms.app_base import CMSApp, CMSAppConfig, CMSAppExtension
@@ -6,15 +7,44 @@ from cms.utils import get_current_site
 from cms.utils.i18n import get_language_tuple
 from django.apps import apps
 from django.contrib.admin import site as admin_site
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db import models
 from django.urls import path, reverse
 
+from djangocms_custom_content.apphooks import AppHookConfig
 from djangocms_custom_content.views import custom_detail_view_factory
 
+logger = logging.getLogger(__name__)
 
-def _get_absolute_url_factory(app_name: str, slug_field: str, view_name: str) -> Callable:
+
+def _get_absolute_url_factory(
+    app_name: str,
+    slug_field: str,
+    view_name: str,
+    grouper_field_name: str = "",
+    namespace_field: str | None = None,
+) -> Callable:
+    """Build a ``get_absolute_url`` that reverses into the right app hook instance.
+
+    django CMS registers one URL resolver per app hook *page*, with the page's
+    application namespace as the instance namespace. Reversing without
+    ``current_app`` therefore always lands on the default instance -- which is
+    wrong as soon as the app hook is attached to more than one page.
+
+    ``namespace_field`` names a field on the grouper holding the instance
+    namespace an object belongs to. Without it the behaviour is unchanged.
+    """
+
     def _get_absolute_url(self) -> str:
-        return reverse(f"{app_name}:{view_name}", kwargs={slug_field: getattr(self, slug_field)})
+        current_app = None
+        if namespace_field and grouper_field_name:
+            grouper = getattr(self, grouper_field_name, None)
+            current_app = getattr(grouper, namespace_field, None) or None
+        return reverse(
+            f"{app_name}:{view_name}",
+            kwargs={slug_field: getattr(self, slug_field)},
+            current_app=current_app,
+        )
 
     return _get_absolute_url
 
@@ -101,33 +131,76 @@ class CustomContentConfig(CMSAppConfig):
                 )
             )
 
-    def register_apphook(self, model: type[models.Model], grouper_model_name: str):
+    @staticmethod
+    def validate_route_field(model: type[models.Model], slug_field: str | None) -> None:
+        """Fail at startup on a ``slug_field`` the content model does not have.
+
+        Without this the misconfiguration registers happily and only surfaces as a
+        ``FieldError`` on every request to a detail URL -- a long way from the
+        declaration that caused it.
+        """
+        if not slug_field or slug_field == "pk":
+            return
+        try:
+            model._meta.get_field(slug_field)
+        except FieldDoesNotExist as error:
+            raise ImproperlyConfigured(
+                f"{model._meta.label}.CMSConfig.apphook declares slug_field={slug_field!r}, "
+                f"but {model._meta.label} has no such field."
+            ) from error
+
+    def register_apphook(self, model: type[models.Model], grouper_model_name: str, grouper_field_name: str = ""):
+        """Generate and register the app hook described by ``CMSConfig.apphook``."""
         cms_config = getattr(model, "CMSConfig", None)
-        apphook = getattr(cms_config, "apphook", None)
-        if apphook:
-            detail_view = custom_detail_view_factory(model).as_view()
-            has_slug_field = model._meta.get_field("slug") is not None
+        config = AppHookConfig.coerce(getattr(cms_config, "apphook", None))
+        if config is None:
+            return
 
-            apphook = type(CMSApp)(
-                f"{grouper_model_name}App",
-                (CMSApp,),
-                {
-                    "name": f"{grouper_model_name}",
-                    "app_name": grouper_model_name.lower(),
-                    "get_urls": lambda self, page=None, language=None, **kwargs: [
-                        path("<slug:slug>/" if has_slug_field else "<int:pk>/", detail_view, name="detail"),
-                    ],
-                },
+        # ``_meta.get_field`` raises rather than returning None, so ask the model.
+        route_field = config.slug_field or ("slug" if model.has_slug_field() else "pk")
+        self.validate_route_field(model, config.slug_field)
+        route = f"<slug:{route_field}>/" if route_field != "pk" else "<int:pk>/"
+
+        detail_view_class = config.detail_view or custom_detail_view_factory(model)
+        # A custom ``slug_field`` names the URL parameter too, so the view has to be
+        # told which model field to look up and which kwarg carries it -- otherwise it
+        # looks for the standard ``slug``/``pk`` and finds neither.
+        view_kwargs = (
+            {"slug_field": route_field, "slug_url_kwarg": route_field} if route_field not in ("slug", "pk") else {}
+        )
+        detail_view = detail_view_class.as_view(**view_kwargs)
+
+        # Extra URLs come first so a literal path can win over the slug pattern.
+        urls = list(config.extra_urls)
+        urls.append(path(route, detail_view, name="detail"))
+        if config.list_view is not None:
+            # Opt-in only: the app hook root is normally a CMS page carrying the
+            # "Custom content list" plugin, which an editor can arrange freely.
+            urls.insert(0, path("", config.list_view.as_view(), name="list"))
+
+        app_name = config.app_name or grouper_model_name.lower()
+        apphook = type(CMSApp)(
+            f"{grouper_model_name}App",
+            (CMSApp,),
+            {
+                "name": config.name or f"{grouper_model_name}",
+                "app_name": app_name,
+                "get_urls": lambda self, page=None, language=None, **kwargs: list(urls),
+            },
+        )
+        apphook_pool.register(apphook)
+
+        if not hasattr(model, "get_absolute_url"):
+            model.add_to_class(
+                "get_absolute_url",
+                _get_absolute_url_factory(
+                    app_name,
+                    route_field,
+                    "detail",
+                    grouper_field_name=grouper_field_name,
+                    namespace_field=config.namespace_field,
+                ),
             )
-            apphook_pool.register(apphook)
-
-            if not hasattr(model, "get_absolute_url"):
-                model.add_to_class(
-                    "get_absolute_url",
-                    _get_absolute_url_factory(
-                        grouper_model_name.lower(), "slug" if has_slug_field else "pk", "detail"
-                    ),
-                )
 
     def register(self, model: type[models.Model]):
         from djangocms_custom_content.models import AbstractCustomGrouper
@@ -161,7 +234,7 @@ class CustomContentConfig(CMSAppConfig):
         self.register_frontend_editing(model, grouper_field_name)
         self.register_versioning(model, grouper_field_name, has_language_field)
         if grouper_field_name:
-            self.register_apphook(model, grouper_model.__name__)
+            self.register_apphook(model, grouper_model.__name__, grouper_field_name)
         else:
             self.register_apphook(model, model.__name__)
 
