@@ -159,13 +159,13 @@ ini_options.python_files = [ "test_*.py" ]
 ini_options.DJANGO_SETTINGS_MODULE = "tests.test_settings"
 
 [tool.coverage]
-run.branch = true
+run.source = [ "djangocms_custom_content" ]
 run.omit = [
   "djangocms_custom_content/management/*",
   "djangocms_custom_content/migrations/*",
   "tests/*",
 ]
-run.source = [ "djangocms_custom_content" ]
+run.branch = true
 report.exclude_lines = [
   "def __repr__",
   "if __name__ == .__main__.:",
