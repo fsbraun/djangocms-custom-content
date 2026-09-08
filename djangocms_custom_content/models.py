@@ -1,5 +1,3 @@
-from cms.models.fields import PlaceholderRelationField
-from cms.models.managers import ContentAdminManager, WithUserMixin
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.fields.reverse_related import ForeignObjectRel
@@ -11,22 +9,11 @@ from djangocms_custom_content.helpers import get_custom_config
 
 class CustomGrouperMixin:
     """
-    Mixin providing base grouper functionality.
-
-    This mixin is inherited by :class:`AbstractCustomGrouper` to provide
-    grouper model functionality. It serves as a marker class for identifying
-    grouper models in the framework.
-    """
-
-    pass
-
-
-class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
-    """
-    Abstract base model for grouper objects.
+    Mixin providing grouper functionality without inheriting ``models.Model``.
 
     A grouper is a container that organizes multiple language versions of content.
-    Inherit from this model when you want to group content versions together.
+    Put this mixin before an existing Django model base when
+    :class:`AbstractCustomGrouper` cannot be used directly.
 
     The grouper automatically discovers its related content model and provides
     methods to access content by language.
@@ -48,9 +35,6 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
         _content_cache: Cache for retrieved content instances
         _is_admin_cache: Flag for admin-specific caching
     """
-
-    class Meta:
-        abstract = True
 
     # Describe the *model*, so they are resolved once and cached on the class.
     _content_accessor_name: str | None = None
@@ -176,12 +160,35 @@ class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
         )
 
 
+class AbstractCustomGrouper(CustomGrouperMixin, models.Model):
+    """Ready-to-use abstract Django model with grouper behavior."""
+
+    class Meta:
+        abstract = True
+
+
+class WithUserMixin:
+    """Small fallback for django CMS' manager mixin."""
+
+    def with_user(self, user):
+        return self
+
+
+class ContentAdminManager(WithUserMixin, models.Manager):
+    """Fallback manager used until django CMS configures the model."""
+
+    def current_content(self, **kwargs):
+        return self.get_queryset().filter(**kwargs)
+
+    def latest_content(self, **kwargs):
+        return self.get_queryset().filter(**kwargs)
+
+
 class CustomContentManager(WithUserMixin, models.Manager):
     """
     Manager for custom content models.
 
-    Provides Django CMS user tracking functionality via :class:`WithUserMixin`,
-    allowing automatic tracking of which user created or modified content.
+    Provides the ``with_user`` API without importing django CMS.
     """
 
     pass
@@ -192,34 +199,19 @@ class CustomContentMixin:
     Mixin providing base content model functionality.
 
     This mixin is inherited by :class:`AbstractCustomContent` to provide
-    content model functionality. It serves as a marker class for identifying
+    content model functionality and serves as a marker class for identifying
     content models in the framework.
-    """
 
-    pass
-
-
-class AbstractCustomContent(CustomContentMixin, models.Model):
-    """
-    Abstract base model providing a PlaceholderRelationField for custom content.
-
-    Inherit from this model in your project to quickly add placeholder support
-    to your custom content types.
+    When combining it with another Django model base, put this mixin first and
+    declare ``objects`` and ``admin_manager`` using the manager classes in this
+    module. The final model must inherit ``models.Model`` through that other base.
 
     To relate content groupers to one another, declare a
     :class:`~djangocms_custom_content.relations.RelationField` on the grouper
     model. See :mod:`djangocms_custom_content.relations`.
     """
 
-    objects = CustomContentManager()
-    admin_manager = ContentAdminManager()
-
-    placeholders = PlaceholderRelationField()
-
     template_name_suffix = "_detail"
-
-    class Meta:
-        abstract = True
 
     def get_template(self) -> str:
         object_meta = self._meta
@@ -276,3 +268,17 @@ class AbstractCustomContent(CustomContentMixin, models.Model):
         )
         if conflicts.exists():
             raise ValidationError({"slug": self.slug_conflict_message()})
+
+
+class AbstractCustomContent(CustomContentMixin, models.Model):
+    """Django model layer for :class:`CustomContentMixin`.
+
+    When django CMS is installed, ``cms_config.py`` adds its placeholder relation
+    and CMS-aware admin manager to concrete subclasses.
+    """
+
+    objects = CustomContentManager()
+    admin_manager = ContentAdminManager()
+
+    class Meta:
+        abstract = True

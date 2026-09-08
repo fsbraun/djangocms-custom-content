@@ -24,6 +24,12 @@ any release.
 - :class:`djangocms_custom_content.models.AbstractCustomContent`, and its
   ``get_template()``, ``validate_unique()`` and ``find_slug_conflicts()`` methods
   along with the ``objects`` and ``admin_manager`` managers
+- :class:`djangocms_custom_content.models.CustomGrouperMixin` and
+  :class:`djangocms_custom_content.models.CustomContentMixin` for combining the
+  same behavior with another Django model base
+- :class:`djangocms_custom_content.models.CustomContentManager` and
+  :class:`djangocms_custom_content.models.ContentAdminManager`, required by
+  content models that use the mixin directly
 
 **Relations**
 
