@@ -3,6 +3,8 @@ from collections.abc import Callable
 
 from cms.app_base import CMSApp, CMSAppConfig, CMSAppExtension
 from cms.apphook_pool import apphook_pool
+from cms.models.fields import PlaceholderRelationField
+from cms.models.managers import ContentAdminManager
 from cms.utils import get_current_site
 from cms.utils.i18n import get_language_tuple
 from django.apps import apps
@@ -15,6 +17,20 @@ from djangocms_custom_content.apphooks import AppHookConfig
 from djangocms_custom_content.views import custom_detail_view_factory
 
 logger = logging.getLogger(__name__)
+
+
+def _configure_cms_model(model: type[models.Model]) -> None:
+    """Add django CMS-only members without changing migration state."""
+    if not any(field.name == "placeholders" for field in model._meta.private_fields):
+        model.add_to_class("placeholders", PlaceholderRelationField())
+
+    if not isinstance(model.admin_manager, ContentAdminManager):
+        default_manager_name = model._default_manager.name
+        model.add_to_class("admin_manager", ContentAdminManager())
+        # A manager added directly to a concrete model otherwise takes priority
+        # over the default manager inherited from the abstract base.
+        model._meta.default_manager_name = default_manager_name
+        model._meta._expire_cache()
 
 
 def _get_absolute_url_factory(
@@ -55,7 +71,7 @@ class CustomContentConfig(CMSAppConfig):
     djangocms_custom_content_enabled = True
 
     def __init__(self, args, **wkargs):
-        from djangocms_custom_content.models import AbstractCustomContent
+        from djangocms_custom_content.models import CustomContentMixin
 
         super().__init__(args, **wkargs)
         # Ensure admins are loaded
@@ -66,7 +82,7 @@ class CustomContentConfig(CMSAppConfig):
         self.init_config()
         all_models = apps.get_models()
         for model in all_models:
-            if not model._meta.abstract and issubclass(model, AbstractCustomContent):
+            if not model._meta.abstract and issubclass(model, CustomContentMixin):
                 self.register(model)
 
     def init_config(self) -> None:
@@ -203,13 +219,15 @@ class CustomContentConfig(CMSAppConfig):
             )
 
     def register(self, model: type[models.Model]):
-        from djangocms_custom_content.models import AbstractCustomGrouper
+        from djangocms_custom_content.models import CustomGrouperMixin
+
+        _configure_cms_model(model)
 
         grouper_field_name = next(
             (
                 f.name
                 for f in model._meta.get_fields()
-                if isinstance(f, models.ForeignKey) and issubclass(f.related_model, AbstractCustomGrouper)
+                if isinstance(f, models.ForeignKey) and issubclass(f.related_model, CustomGrouperMixin)
             ),
             "",
         )
