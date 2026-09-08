@@ -122,6 +122,8 @@ The abstract models are the normal entry point. They combine the framework
 mixins with ``django.db.models.Model`` and, for content, install the required
 managers.
 
+.. _mixin-model-bases:
+
 Using the mixins with another model base
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

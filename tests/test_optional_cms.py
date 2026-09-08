@@ -54,7 +54,7 @@ sys.meta_path.insert(0, RejectCMSImports())
 from django.conf import settings
 
 settings.configure(
-    INSTALLED_APPS=["djangocms_custom_content"],
+    INSTALLED_APPS=["django.contrib.contenttypes", "djangocms_custom_content"],
     DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
     SECRET_KEY="test",
     USE_I18N=True,
@@ -64,6 +64,7 @@ import django
 
 django.setup()
 
+from django.contrib.contenttypes.models import ContentType
 from django.db import connection, models
 from djangocms_custom_content.models import (
     ContentAdminManager,
@@ -71,9 +72,19 @@ from djangocms_custom_content.models import (
     CustomContentMixin,
     CustomGrouperMixin,
 )
+from djangocms_custom_content.relations import RelationField
+
+
+class Topic(CustomGrouperMixin, models.Model):
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        app_label = "djangocms_custom_content"
 
 
 class Article(CustomGrouperMixin, models.Model):
+    topics = RelationField(Topic, related_name="articles")
+
     class Meta:
         app_label = "djangocms_custom_content"
 
@@ -93,10 +104,14 @@ class ArticleContent(CustomContentMixin, models.Model):
 assert not hasattr(ArticleContent, "placeholders")
 
 with connection.schema_editor() as schema_editor:
+    schema_editor.create_model(ContentType)
+    schema_editor.create_model(Topic)
     schema_editor.create_model(Article)
     schema_editor.create_model(ArticleContent)
+    schema_editor.create_model(Article.topics.field.through)
 
 article = Article.objects.create()
+topic = Topic.objects.create(name="Reusable apps")
 content = ArticleContent.objects.with_user(object()).create(
     article=article,
     language="en",
@@ -106,6 +121,9 @@ content = ArticleContent.objects.with_user(object()).create(
 assert article.get_content("en") == content
 assert article.get_admin_content("en") == content
 assert ArticleContent.admin_manager.latest_content().get() == content
+article.topics.add(topic)
+assert list(article.topics.all()) == [topic]
+assert list(topic.articles.all()) == [article]
 """
         result = subprocess.run(
             [sys.executable, "-c", script],
