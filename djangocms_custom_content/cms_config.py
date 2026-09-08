@@ -24,7 +24,7 @@ def _configure_cms_model(model: type[models.Model]) -> None:
     if not any(field.name == "placeholders" for field in model._meta.private_fields):
         model.add_to_class("placeholders", PlaceholderRelationField())
 
-    if not isinstance(model.admin_manager, ContentAdminManager):
+    if not isinstance(getattr(model, "admin_manager", None), ContentAdminManager):
         default_manager_name = model._default_manager.name
         model.add_to_class("admin_manager", ContentAdminManager())
         # A manager added directly to a concrete model otherwise takes priority
