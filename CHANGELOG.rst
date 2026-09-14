@@ -132,7 +132,15 @@ Fixed
 * The toolbar's "settings" link and gear now carry the content object being
   viewed, so a published version and its newer draft no longer open the same
   form. Requires django CMS 5.1 or later; on 5.0 the link falls back to editing
-  the latest content, as before.
+  the latest content, as before. Two upstream defects narrowed this further at
+  release: django CMS 5.1.0 and 5.1.1 showed the read-only note on every
+  editable draft of a content model without a ``language`` field (fixed in 5.1.2
+  and backported to 5.0.11), and ``djangocms-versioning`` ignores the
+  ``cms_content`` parameter up to and including 2.7.0, so with versioning
+  installed the link still opens the latest content
+  (`#603 <https://github.com/django-cms/djangocms-versioning/pull/603>`_, merged
+  but unreleased). Full behaviour therefore needs django CMS 5.1.2 or 5.0.11 and
+  a ``djangocms-versioning`` release later than 2.7.0.
 * ``BlogPostTeaserPlugin`` passed the grouper to a template expecting content, so
   teasers rendered empty. ``PersonTeaserPlugin`` set a context key the template
   did not read.

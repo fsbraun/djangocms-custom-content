@@ -37,7 +37,7 @@ dependencies = [
 # Named after the package it installs: versioning is optional, and
 # djangocms-versioning is one implementation of it rather than the concept.
 optional-dependencies.djangocms-versioning = [
-  "djangocms-versioning>=2.3",
+  "djangocms-versioning>=2.7.1",
 ]
 optional-dependencies.test = [
   "djangocms-custom-content[djangocms-versioning]",
