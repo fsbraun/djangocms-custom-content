@@ -10,6 +10,29 @@ Building custom content in django CMS by hand means wiring up a grouper,
 versioning, a grouper admin, frontend editing, an app hook and migrations
 yourself. ``djangocms-custom-content`` does all of that — you write the model.
 
+Why this exists
+===============
+
+    The application should own the architecture. The CMS should make it editable.
+
+Most CMS integrations run the other way round: the domain model gets rebuilt
+inside the CMS, and the application ends up serving the page tree. This package
+takes the opposite route — your models stay yours, and django CMS adds
+versioning, translations and in-page editing on top of them.
+
+The thinking behind it:
+
+* `The CMS Is Not the Application
+  <https://www.django-cms.org/resources/blog/2026/08/24/the-cms-is-not-the-application/>`_
+  — why a CMS makes a poor foundation for an application.
+* `Make Your Django Application Editable
+  <https://www.django-cms.org/resources/blog/2026/08/31/make-your-django-application-editable/>`_
+  — the CMS doesn't need to own your data to make it editable. This package grew
+  out of that post.
+* `Stop Rebuilding the Same Django App for Every Client
+  <https://www.fabian-braun.de/writing/stop-rebuilding-apps/>`_
+  — the case for reusable domain apps, which is what ``contrib`` below is.
+
 Write this…
 ===========
 
