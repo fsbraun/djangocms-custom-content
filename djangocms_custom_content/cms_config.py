@@ -114,10 +114,13 @@ class CustomContentConfig(CMSAppConfig):
         cms_config = getattr(model, "CMSConfig", None)
         enable_versioning = getattr(cms_config, "enable_versioning", False)
         if enable_versioning and getattr(self, "versioning_contract", None):
+            from djangocms_versioning.datastructures import default_copy
+
             # Add versioning enabled models
             self.versioning.append(
                 self.versioning_contract(
                     content_model=model,
+                    copy_function=default_copy,
                     grouper_field_name=grouper_field_name,
                     extra_grouping_fields=["language"] if has_language_field else [],
                     version_list_filter_lookups={
