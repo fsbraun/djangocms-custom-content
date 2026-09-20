@@ -34,12 +34,6 @@ Add to your Django settings:
         "djangocms_custom_content",
     ]
 
-Then run migrations:
-
-.. code-block:: bash
-
-    python manage.py migrate djangocms_custom_content
-
 Step 3: Create a Django App
 ----------------------------
 
