@@ -29,10 +29,7 @@ classifiers = [
 ]
 dynamic = [ "version" ]
 dependencies = [
-  # 5.0 is supported; 5.1 adds GrouperModelAdmin.content_pk_url_param, without
-  # which the toolbar settings link cannot name the version being viewed and
-  # falls back to editing the latest content.
-  "django-cms>=5",
+  "django>=5.2",
 ]
 # Named after the package it installs: versioning is optional, and
 # djangocms-versioning is one implementation of it rather than the concept.

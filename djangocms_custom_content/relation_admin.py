@@ -24,6 +24,8 @@ from django.urls import path, reverse
 from djangocms_custom_content.forms import RelationModelForm
 from djangocms_custom_content.relations import iter_relation_fields
 
+# Mirrors ``cms.admin.utils.CONTENT_PREFIX``, kept local so the admin modules
+# import without django CMS installed.
 CONTENT_PREFIX = "content__"
 
 

@@ -1,13 +1,11 @@
 from typing import TYPE_CHECKING
 
-from cms.admin.utils import CONTENT_PREFIX
-from cms.utils.urlutils import admin_reverse
 from django.apps import apps
 from django.db import models
 from django.http import HttpResponseRedirect
 from django.urls import path
 
-from djangocms_custom_content.relation_admin import RelationAdminMixin
+from djangocms_custom_content.relation_admin import CONTENT_PREFIX, RelationAdminMixin
 
 if TYPE_CHECKING:
     from django.contrib.admin import AdminSite
@@ -91,6 +89,11 @@ class CustomGrouperAdminMixin(RelationAdminMixin):
         djangocms-versioning uses content admin URLs for breadcrumbs, but this
         project uses grouper admin classes and must redirect accordingly.
         """
+        # Only reachable under django CMS, so the import stays out of the module
+        # body: Django's admin autodiscovery imports this module on every
+        # install, including those without django CMS.
+        from cms.utils.urlutils import admin_reverse
+
         id = kwargs.get("slug")
         info = f"{self.model._meta.app_label}_{self.model._meta.model_name}"
         if id:

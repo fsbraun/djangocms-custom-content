@@ -118,6 +118,72 @@ the simpler shape; ``contrib.people`` and ``contrib.services`` are built that wa
 Models
 ------
 
+The abstract models are the normal entry point. They combine the framework
+mixins with ``django.db.models.Model`` and, for content, install the required
+managers.
+
+.. _mixin-model-bases:
+
+Using the mixins with another model base
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use the mixins directly when a model already has to inherit from another Django
+model base. The mixins deliberately do **not** inherit from ``models.Model``;
+the other base must do so. Put the framework mixin first so its cooperative
+``super()`` calls continue through the existing model:
+
+.. code-block:: python
+
+    from django.db import models
+
+    from djangocms_custom_content.models import (
+        ContentAdminManager,
+        CustomContentManager,
+        CustomContentMixin,
+        CustomGrouperMixin,
+    )
+
+
+    class ExistingGrouperBase(models.Model):
+        external_id = models.UUIDField()
+
+        class Meta:
+            abstract = True
+
+
+    class ExistingContentBase(models.Model):
+        updated_at = models.DateTimeField(auto_now=True)
+
+        class Meta:
+            abstract = True
+
+
+    class Article(CustomGrouperMixin, ExistingGrouperBase):
+        pass
+
+
+    class ArticleContent(CustomContentMixin, ExistingContentBase):
+        # Plain Python mixins cannot contribute Django managers, so mixin-only
+        # content models declare the same managers as AbstractCustomContent.
+        objects = CustomContentManager()
+        admin_manager = ContentAdminManager()
+
+        article = models.ForeignKey(Article, on_delete=models.CASCADE)
+        language = models.CharField(max_length=8)
+        title = models.CharField(max_length=200)
+
+        class CMSConfig:
+            enable_versioning = True
+            enable_frontend_editing = True
+
+Mixin-only models are discovered and configured exactly like subclasses of the
+abstract models. When django CMS starts, the fallback ``admin_manager`` is
+replaced by django CMS's manager and the placeholder relation is added. Without
+django CMS, both models remain ordinary usable Django models.
+
+Do not combine a mixin with its corresponding abstract model: the abstract model
+already includes it.
+
 .. autoclass:: djangocms_custom_content.models.AbstractCustomGrouper
    :members:
    :show-inheritance:
@@ -130,6 +196,12 @@ Models
    :members:
 
 .. autoclass:: djangocms_custom_content.models.CustomContentMixin
+   :members:
+
+.. autoclass:: djangocms_custom_content.models.CustomContentManager
+   :members:
+
+.. autoclass:: djangocms_custom_content.models.ContentAdminManager
    :members:
 
 Relations

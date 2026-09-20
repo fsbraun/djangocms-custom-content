@@ -1,5 +1,9 @@
 import os
 
+from cms import __version__ as cms_version
+
+CMS_MAIN = "dev" in cms_version
+
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
@@ -11,7 +15,6 @@ INSTALLED_APPS = [
     "filer",
     "cms",
     "menus",
-    "treebeard",
     "sekizai",
     "djangocms_custom_content",
     "djangocms_custom_content.contrib.blog",
@@ -21,7 +24,12 @@ INSTALLED_APPS = [
     "tests.test_app",
 ]
 
-try:  # V4 test?
+if CMS_MAIN:
+    CMS_TREE_BACKEND = "mptree"
+else:
+    INSTALLED_APPS.insert(INSTALLED_APPS.index("sekizai"), "treebeard")
+
+try:  # Versioning test?
     import djangocms_versioning  # noqa
 
     INSTALLED_APPS += [

@@ -50,10 +50,10 @@ def _grouper_fk(content_model: type[models.Model]):
     """Return the FK field from a content model to its grouper, or ``None``.
 
     Resolved structurally (a content model carries a ForeignKey to an
-    :class:`AbstractCustomGrouper`) so it works at import time, before the
+    :class:`CustomGrouperMixin`) so it works at import time, before the
     cms_config registry is populated.
     """
-    from djangocms_custom_content.models import AbstractCustomGrouper, CustomContentMixin
+    from djangocms_custom_content.models import CustomContentMixin, CustomGrouperMixin
 
     if not issubclass(content_model, CustomContentMixin):
         return None
@@ -61,7 +61,7 @@ def _grouper_fk(content_model: type[models.Model]):
     # get_fields(), which builds the reverse-relation tree and would require
     # the full app registry (not available during lazy target binding).
     for field in content_model._meta.local_fields:
-        if isinstance(field, models.ForeignKey) and issubclass(field.related_model, AbstractCustomGrouper):
+        if isinstance(field, models.ForeignKey) and issubclass(field.related_model, CustomGrouperMixin):
             return field
     return None
 
@@ -73,9 +73,9 @@ def grouper_model_of(model: type[models.Model]) -> type[models.Model]:
     declaration may name either the grouper or its content model; both resolve
     here to the grouper ("if there is one").
     """
-    from djangocms_custom_content.models import AbstractCustomGrouper
+    from djangocms_custom_content.models import CustomGrouperMixin
 
-    if issubclass(model, AbstractCustomGrouper):
+    if issubclass(model, CustomGrouperMixin):
         return model
     fk = _grouper_fk(model)
     return fk.related_model if fk else model
@@ -448,9 +448,9 @@ def _cleanup_relations_on_target_delete(sender, instance, **kwargs):
     unless relation tables exist, and only ever runs for grouper instances
     (the only thing a relation can target).
     """
-    from djangocms_custom_content.models import AbstractCustomGrouper
+    from djangocms_custom_content.models import CustomGrouperMixin
 
-    if not _through_registry or not isinstance(instance, AbstractCustomGrouper):
+    if not _through_registry or not isinstance(instance, CustomGrouperMixin):
         return
     ct = _content_type_for(sender)
     for through in _through_registry:
