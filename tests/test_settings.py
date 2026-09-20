@@ -29,7 +29,7 @@ if CMS_MAIN:
 else:
     INSTALLED_APPS.insert(INSTALLED_APPS.index("sekizai"), "treebeard")
 
-try:  # V4 test?
+try:  # Versioning test?
     import djangocms_versioning  # noqa
 
     INSTALLED_APPS += [
