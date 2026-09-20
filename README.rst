@@ -67,6 +67,10 @@ Why you'll want it
   key or migration on the target model.
 * **Multi-language & versioned** — per-language draft/publish history per content
   model.
+* **Reusable apps don't have to require django CMS** — the model bases, mixins
+  and relations are plain Django, so an app you build on them installs in
+  projects that have no django CMS. Where it *is* installed, the CMS features
+  switch themselves on.
 * **Batteries included** — complete blog, people, categories and services apps,
   supported and migrated, to install as-is or read and adapt.
 * **Current django CMS and Django** — see the badges above for the supported
@@ -132,6 +136,34 @@ To enable one (or more), add the module(s) to ``INSTALLED_APPS`` and run migrati
     ]
 
     python manage.py migrate
+
+Ship a reusable app, django CMS optional
+========================================
+
+Publishing a reusable app normally forces a choice: depend on django CMS and
+narrow who can install it, or skip it and hand-roll versioning and editing
+yourself. You don't have to choose.
+
+The model bases, mixins and ``RelationField`` import Django only, so your app
+also runs in a project that has never heard of django CMS::
+
+    INSTALLED_APPS = [
+        "django.contrib.contenttypes",  # required by RelationField
+        "djangocms_custom_content",
+        "my_reusable_app",
+    ]
+
+Same models, same ``article.get_content("en")``, same relations. Install django
+CMS alongside them and versioning, placeholders, frontend editing, app hooks and
+plugins light up — your models don't change, because the inner ``CMSConfig``
+they carry is an ordinary Python class that nothing reads until django CMS
+starts up.
+
+The one rule: keep CMS-specific code in the modules django CMS discovers by
+itself (``cms_config.py``, ``cms_plugins.py``) and don't import them from
+``models.py``. The full walkthrough, including what CMS features you give up:
+
+https://djangocms-custom-content.readthedocs.io/en/latest/how-to/without_cms.html
 
 Contributing
 ============
