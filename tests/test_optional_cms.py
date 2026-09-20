@@ -35,9 +35,7 @@ class CMSModelConfigurationTests(SimpleTestCase):
         self.assertEqual(ExampleContent._default_manager.name, "objects")
 
 
-class WithoutDjangoCMSIntegrationTests(SimpleTestCase):
-    def test_models_work_when_django_cms_is_unavailable(self):
-        script = r"""
+BLOCK_CMS_IMPORTS = r"""
 import sys
 from importlib.abc import MetaPathFinder
 
@@ -50,7 +48,23 @@ class RejectCMSImports(MetaPathFinder):
 
 
 sys.meta_path.insert(0, RejectCMSImports())
+"""
 
+
+class WithoutDjangoCMSIntegrationTests(SimpleTestCase):
+    def run_without_django_cms(self, script: str) -> None:
+        """Run ``script`` in a subprocess where every ``cms`` import fails."""
+        result = subprocess.run(
+            [sys.executable, "-c", BLOCK_CMS_IMPORTS + script],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_models_work_when_django_cms_is_unavailable(self):
+        self.run_without_django_cms(
+            r"""
 from django.conf import settings
 
 settings.configure(
@@ -125,10 +139,53 @@ article.topics.add(topic)
 assert list(article.topics.all()) == [topic]
 assert list(topic.articles.all()) == [article]
 """
-        result = subprocess.run(
-            [sys.executable, "-c", script],
-            check=False,
-            capture_output=True,
-            text=True,
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_admin_autodiscovery_works_when_django_cms_is_unavailable(self):
+        """``django.contrib.admin`` imports every app's ``admin`` module on setup."""
+        self.run_without_django_cms(
+            r"""
+from django.conf import settings
+
+settings.configure(
+    INSTALLED_APPS=[
+        "django.contrib.contenttypes",
+        "django.contrib.auth",
+        "django.contrib.messages",
+        "django.contrib.admin",
+        "djangocms_custom_content",
+    ],
+    DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
+    SECRET_KEY="test",
+    USE_I18N=True,
+)
+
+import django
+
+# AdminConfig.ready() autodiscovers admin modules, so this is where an
+# unconditional django CMS import in admin.py would raise ModuleNotFoundError.
+django.setup()
+
+assert "djangocms_custom_content.admin" in sys.modules
+
+from django.contrib import admin
+from django.db import models
+from djangocms_custom_content.admin import CONTENT_PREFIX, CustomGrouperAdminMixin
+from djangocms_custom_content.models import CustomGrouperMixin
+
+
+class Article(CustomGrouperMixin, models.Model):
+    title = models.CharField(max_length=100)
+
+    class Meta:
+        app_label = "djangocms_custom_content"
+
+
+class ArticleAdmin(CustomGrouperAdminMixin, admin.ModelAdmin):
+    pass
+
+
+ArticleAdmin(Article, admin.site)
+assert CONTENT_PREFIX == "content__"
+"""
+        )
